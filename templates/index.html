@@ -29,26 +29,29 @@
     <nav class="w-56 bg-card border-r border-border flex flex-col fixed h-full">
       <div class="p-5 border-b border-border">
         <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">AIGC Prompt Collector</h1>
-        <p class="text-xs text-muted mt-1">多平台提示词采集</p>
+        <p class="text-xs text-muted mt-1" data-i18n="nav.subtitle">多平台提示词采集</p>
       </div>
       <div class="flex-1 p-3 space-y-1">
         <a href="#dashboard" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="dashboard">
           <span>📊</span> Dashboard
         </a>
         <a href="#tasks" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="tasks">
-          <span>🚀</span> 采集任务
+          <span>🚀</span> <span data-i18n="nav.tasks">采集任务</span>
         </a>
         <a href="#notes" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="notes">
-          <span>📝</span> 提示词浏览
+          <span>📝</span> <span data-i18n="nav.notes">提示词浏览</span>
         </a>
         <a href="#schedules" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="schedules">
-          <span>⏰</span> 定时任务
+          <span>⏰</span> <span data-i18n="nav.schedules">定时任务</span>
         </a>
       </div>
-      <div class="p-3 border-t border-border">
+      <div class="p-3 border-t border-border space-y-1">
         <a href="#settings" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="settings">
-          <span>⚙️</span> 设置
+          <span>⚙️</span> <span data-i18n="nav.settings">设置</span>
         </a>
+        <button onclick="toggleLang()" id="lang-btn" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-500 hover:bg-white/[0.03] hover:text-gray-300 transition-colors w-full">
+          <span>🌐</span> <span id="lang-label">EN</span>
+        </button>
       </div>
     </nav>
 
@@ -61,20 +64,20 @@
         <div id="stats-cards" class="grid grid-cols-4 gap-4 mb-8"></div>
         <div class="grid grid-cols-2 gap-6 mb-8">
           <div class="bg-card rounded-xl border border-border p-5">
-            <h3 class="text-sm font-medium text-muted mb-4">分类分布</h3>
+            <h3 class="text-sm font-medium text-muted mb-4" data-i18n="dash.categories">分类分布</h3>
             <div id="chart-categories"></div>
           </div>
           <div class="bg-card rounded-xl border border-border p-5">
-            <h3 class="text-sm font-medium text-muted mb-4">模型分布</h3>
+            <h3 class="text-sm font-medium text-muted mb-4" data-i18n="dash.models">模型分布</h3>
             <div id="chart-models"></div>
           </div>
         </div>
         <div class="bg-card rounded-xl border border-border p-5">
-          <h3 class="text-sm font-medium text-muted mb-4">最近采集</h3>
+          <h3 class="text-sm font-medium text-muted mb-4" data-i18n="dash.recent">最近采集</h3>
           <table class="w-full text-sm">
             <thead><tr class="text-left text-muted border-b border-border">
-              <th class="pb-2">标题</th><th class="pb-2">分类</th><th class="pb-2">模型</th>
-              <th class="pb-2">图片</th><th class="pb-2">时间</th>
+              <th class="pb-2" data-i18n="col.title">标题</th><th class="pb-2" data-i18n="col.category">分类</th><th class="pb-2" data-i18n="col.model">模型</th>
+              <th class="pb-2" data-i18n="col.images">图片</th><th class="pb-2" data-i18n="col.time">时间</th>
             </tr></thead>
             <tbody id="recent-table"></tbody>
           </table>
@@ -83,13 +86,13 @@
 
       <!-- Tasks -->
       <section id="page-tasks" class="page hidden">
-        <h2 class="text-xl font-semibold mb-6 text-gray-100">采集任务</h2>
+        <h2 class="text-xl font-semibold mb-6 text-gray-100" data-i18n="tasks.title">采集任务</h2>
         <div class="grid grid-cols-2 gap-6 mb-6">
           <div class="bg-card rounded-xl border border-border p-6">
-            <h3 class="text-sm font-medium text-muted mb-4">新建任务</h3>
+            <h3 class="text-sm font-medium text-muted mb-4" data-i18n="tasks.new">新建任务</h3>
             <form id="task-form" class="space-y-4">
               <div>
-                <label class="block text-sm text-gray-400 mb-1">采集平台</label>
+                <label class="block text-sm text-gray-400 mb-1" data-i18n="form.platform">采集平台</label>
                 <select name="platform" id="task-platform"
                   class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                 </select>
@@ -106,61 +109,61 @@
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm text-gray-400 mb-1">最大笔记数</label>
+                  <label class="block text-sm text-gray-400 mb-1" data-i18n="form.max_notes">最大笔记数</label>
                   <input name="max_notes" type="number" value="20" min="1" max="100"
                     class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                 </div>
                 <div>
-                  <label class="block text-sm text-gray-400 mb-1">延迟 (秒)</label>
+                  <label class="block text-sm text-gray-400 mb-1" data-i18n="form.delay">延迟 (秒)</label>
                   <input name="delay" type="number" value="3" min="1" max="10"
                     class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                 </div>
               </div>
               <button type="submit" id="task-btn"
                 class="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                🚀 开始采集
+                <span data-i18n="tasks.start">🚀 开始采集</span>
               </button>
             </form>
           </div>
           <div class="bg-card rounded-xl border border-border p-6 flex flex-col">
             <div class="flex items-center justify-between mb-4">
-              <h3 class="text-sm font-medium text-muted">实时日志</h3>
+              <h3 class="text-sm font-medium text-muted" data-i18n="tasks.live_log">实时日志</h3>
               <button id="stop-btn" onclick="stopCurrentTask()" class="hidden px-3 py-1 bg-red-600/80 text-white rounded-lg text-xs hover:bg-red-500 transition-colors">
                 ⏹ 停止
               </button>
             </div>
             <div id="log-terminal" class="log-terminal flex-1 min-h-[200px] max-h-[500px] bg-black/60 text-emerald-400/90 rounded-lg p-4 overflow-y-auto whitespace-pre-wrap border border-border">
-              等待任务启动...
+              <span data-i18n="tasks.waiting">等待任务启动...</span>
             </div>
           </div>
         </div>
         <!-- Task History -->
         <div class="bg-card rounded-xl border border-border p-5">
-          <h3 class="text-sm font-medium text-muted mb-4">任务历史</h3>
+          <h3 class="text-sm font-medium text-muted mb-4" data-i18n="tasks.history">任务历史</h3>
           <table class="w-full text-sm">
             <thead><tr class="text-left text-muted border-b border-border">
-              <th class="pb-2">ID</th><th class="pb-2">平台</th><th class="pb-2">关键词</th><th class="pb-2">分类</th>
-              <th class="pb-2">数量</th><th class="pb-2">状态</th><th class="pb-2">开始时间</th>
-              <th class="pb-2">操作</th>
+              <th class="pb-2">ID</th><th class="pb-2" data-i18n="col.platform">平台</th><th class="pb-2" data-i18n="col.keyword">关键词</th><th class="pb-2" data-i18n="col.category">分类</th>
+              <th class="pb-2" data-i18n="col.count">数量</th><th class="pb-2" data-i18n="col.status">状态</th><th class="pb-2" data-i18n="col.start_time">开始时间</th>
+              <th class="pb-2" data-i18n="col.actions">操作</th>
             </tr></thead>
             <tbody id="task-history"></tbody>
           </table>
-          <p id="task-history-empty" class="text-muted text-sm text-center py-4 hidden">暂无任务记录</p>
+          <p id="task-history-empty" class="text-muted text-sm text-center py-4 hidden" data-i18n="tasks.empty">暂无任务记录</p>
         </div>
       </section>
 
       <!-- Notes Browser -->
       <section id="page-notes" class="page hidden">
         <div class="flex items-center justify-between mb-6">
-          <h2 class="text-xl font-semibold text-gray-100">提示词浏览</h2>
+          <h2 class="text-xl font-semibold text-gray-100" data-i18n="notes.title">提示词浏览</h2>
           <div class="flex gap-3">
             <select id="filter-category" class="px-3 py-2 bg-card border border-border rounded-lg text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="">全部分类</option>
+              <option value="" data-i18n="notes.all_cats">全部分类</option>
             </select>
             <select id="filter-model" class="px-3 py-2 bg-card border border-border rounded-lg text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="">全部模型</option>
+              <option value="" data-i18n="notes.all_models">全部模型</option>
             </select>
-            <input id="filter-search" type="text" placeholder="搜索标题/描述..."
+            <input id="filter-search" type="text" data-i18n-ph="notes.search_ph" placeholder="搜索标题/描述..."
               class="px-3 py-2 bg-card border border-border rounded-lg text-sm text-gray-300 w-48 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
           </div>
         </div>
@@ -170,70 +173,70 @@
 
       <!-- Schedules -->
       <section id="page-schedules" class="page hidden">
-        <h2 class="text-xl font-semibold mb-6 text-gray-100">定时任务</h2>
+        <h2 class="text-xl font-semibold mb-6 text-gray-100" data-i18n="sched.title">定时任务</h2>
         <div class="grid grid-cols-3 gap-6 mb-6">
           <!-- Create Schedule Form -->
           <div class="bg-card rounded-xl border border-border p-6 col-span-1">
-            <h3 class="text-sm font-medium text-muted mb-4">新建定时任务</h3>
+            <h3 class="text-sm font-medium text-muted mb-4" data-i18n="sched.new">新建定时任务</h3>
             <form id="schedule-form" class="space-y-3">
               <div>
-                <label class="block text-sm text-gray-400 mb-1">采集平台</label>
+                <label class="block text-sm text-gray-400 mb-1" data-i18n="form.platform">采集平台</label>
                 <select name="platform" id="schedule-platform"
                   class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                 </select>
               </div>
               <div>
-                <label class="block text-sm text-gray-400 mb-1">搜索关键词</label>
-                <input name="keyword" type="text" placeholder="如：建筑提示词" required
+                <label class="block text-sm text-gray-400 mb-1" data-i18n="form.keyword">搜索关键词</label>
+                <input name="keyword" type="text" data-i18n-ph="form.keyword_ph" placeholder="如：建筑提示词" required
                   class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               </div>
               <div>
-                <label class="block text-sm text-gray-400 mb-1">分类标签</label>
-                <input name="category" type="text" placeholder="如：建筑" required
+                <label class="block text-sm text-gray-400 mb-1" data-i18n="form.category">分类标签</label>
+                <input name="category" type="text" data-i18n-ph="form.category_ph" placeholder="如：建筑" required
                   class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm text-gray-400 mb-1">最大笔记数</label>
+                  <label class="block text-sm text-gray-400 mb-1" data-i18n="form.max_notes">最大笔记数</label>
                   <input name="max_notes" type="number" value="20" min="1" max="100"
                     class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                 </div>
                 <div>
-                  <label class="block text-sm text-gray-400 mb-1">间隔 (小时)</label>
+                  <label class="block text-sm text-gray-400 mb-1" data-i18n="form.interval">间隔 (小时)</label>
                   <input name="interval_hours" type="number" value="24" min="0.5" max="168" step="0.5"
                     class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
                 </div>
               </div>
               <button type="submit"
                 class="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 transition-colors">
-                ⏰ 创建定时任务
+                <span data-i18n="sched.create_btn">⏰ 创建定时任务</span>
               </button>
             </form>
           </div>
           <!-- Schedule Info -->
           <div class="bg-card rounded-xl border border-border p-6 col-span-2">
-            <h3 class="text-sm font-medium text-muted mb-3">说明</h3>
-            <ul class="text-sm text-gray-400 space-y-2">
-              <li>• 定时任务按设定间隔自动运行采集，<strong class="text-gray-300">已采集过的笔记会自动跳过</strong>（去重）</li>
-              <li>• 服务启动后调度器自动运行，每 30 秒检查一次是否有到期任务</li>
-              <li>• 每次执行会生成一条采集任务记录，可在「采集任务」页查看日志</li>
-              <li>• 最小间隔 0.5 小时，建议不要设太短以免触发反爬</li>
-              <li>• 可随时启用/禁用或删除定时任务</li>
+            <h3 class="text-sm font-medium text-muted mb-3" data-i18n="sched.info_title">说明</h3>
+            <ul id="sched-info-list" class="text-sm text-gray-400 space-y-2">
+              <li data-i18n="sched.info1">• 定时任务按设定间隔自动运行采集，已采集过的笔记会自动跳过（去重）</li>
+              <li data-i18n="sched.info2">• 服务启动后调度器自动运行，每 30 秒检查一次是否有到期任务</li>
+              <li data-i18n="sched.info3">• 每次执行会生成一条采集任务记录，可在「采集任务」页查看日志</li>
+              <li data-i18n="sched.info4">• 最小间隔 0.5 小时，建议不要设太短以免触发反爬</li>
+              <li data-i18n="sched.info5">• 可随时启用/禁用或删除定时任务</li>
             </ul>
           </div>
         </div>
         <!-- Schedule List -->
         <div class="bg-card rounded-xl border border-border p-5">
-          <h3 class="text-sm font-medium text-muted mb-4">定时任务列表</h3>
+          <h3 class="text-sm font-medium text-muted mb-4" data-i18n="sched.list">定时任务列表</h3>
           <table class="w-full text-sm">
             <thead><tr class="text-left text-muted border-b border-border">
-              <th class="pb-2">平台</th><th class="pb-2">关键词</th><th class="pb-2">分类</th><th class="pb-2">数量</th>
-              <th class="pb-2">间隔</th><th class="pb-2">状态</th>
-              <th class="pb-2">上次执行</th><th class="pb-2">下次执行</th><th class="pb-2">操作</th>
+              <th class="pb-2" data-i18n="col.platform">平台</th><th class="pb-2" data-i18n="col.keyword">关键词</th><th class="pb-2" data-i18n="col.category">分类</th><th class="pb-2" data-i18n="col.count">数量</th>
+              <th class="pb-2" data-i18n="col.interval">间隔</th><th class="pb-2" data-i18n="col.status">状态</th>
+              <th class="pb-2" data-i18n="col.last_run">上次执行</th><th class="pb-2" data-i18n="col.next_run">下次执行</th><th class="pb-2" data-i18n="col.actions">操作</th>
             </tr></thead>
             <tbody id="schedule-list"></tbody>
           </table>
-          <p id="schedule-empty" class="text-muted text-sm text-center py-4 hidden">暂无定时任务</p>
+          <p id="schedule-empty" class="text-muted text-sm text-center py-4 hidden" data-i18n="sched.empty">暂无定时任务</p>
         </div>
       </section>
 
@@ -241,10 +244,10 @@
       <section id="page-detail" class="page hidden">
         <div class="flex items-center justify-between mb-4">
           <button onclick="history.back()" class="text-sm text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1">
-            ← 返回列表
+            <span data-i18n="detail.back">← 返回列表</span>
           </button>
           <button id="delete-note-btn" class="px-3 py-1.5 bg-red-600/20 text-red-400 rounded-lg text-xs hover:bg-red-600/40 transition-colors">
-            🗑 删除笔记
+            <span data-i18n="detail.delete">🗑 删除笔记</span>
           </button>
         </div>
         <div class="grid grid-cols-2 gap-6">
@@ -258,7 +261,7 @@
               <div id="detail-prompt" class="space-y-3"></div>
             </div>
             <div class="bg-card rounded-xl border border-border p-5">
-              <h3 class="text-sm font-medium text-muted mb-2">原始描述</h3>
+              <h3 class="text-sm font-medium text-muted mb-2" data-i18n="detail.raw_desc">原始描述</h3>
               <p id="detail-desc" class="text-sm text-gray-400 whitespace-pre-wrap"></p>
             </div>
           </div>
@@ -267,11 +270,11 @@
 
       <!-- Settings -->
       <section id="page-settings" class="page hidden">
-        <h2 class="text-xl font-semibold mb-6 text-gray-100">设置</h2>
+        <h2 class="text-xl font-semibold mb-6 text-gray-100" data-i18n="settings.title">设置</h2>
         <div class="max-w-xl space-y-6">
           <div class="bg-card rounded-xl border border-border p-6">
             <h3 class="text-sm font-medium text-muted mb-4">OpenRouter API Key</h3>
-            <p class="text-xs text-gray-500 mb-4">用于调用 LLM 提取结构化提示词。获取地址：<a href="https://openrouter.ai/keys" target="_blank" class="text-indigo-400 hover:text-indigo-300">openrouter.ai/keys</a></p>
+            <p class="text-xs text-gray-500 mb-4" data-i18n-html="settings.apikey_desc">用于调用 LLM 提取结构化提示词。获取地址：<a href="https://openrouter.ai/keys" target="_blank" class="text-indigo-400 hover:text-indigo-300">openrouter.ai/keys</a></p>
             <div id="apikey-status" class="mb-4"></div>
             <div class="flex gap-3">
               <input id="apikey-input" type="password" placeholder="sk-or-v1-..."
@@ -282,13 +285,13 @@
               </button>
               <button onclick="saveApiKey()"
                 class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 transition-colors">
-                保存
+                <span data-i18n="settings.save">保存</span>
               </button>
             </div>
             <p id="apikey-msg" class="text-xs mt-2 hidden"></p>
           </div>
           <div class="bg-card rounded-xl border border-border p-6">
-            <h3 class="text-sm font-medium text-muted mb-4">登录状态</h3>
+            <h3 class="text-sm font-medium text-muted mb-4" data-i18n="settings.login_status">登录状态</h3>
             <div id="cookie-status" class="text-sm text-gray-400"></div>
           </div>
         </div>
@@ -303,6 +306,136 @@
   </div>
 
 <script>
+// ---------------------------------------------------------------------------
+// i18n
+// ---------------------------------------------------------------------------
+const I18N = {
+  zh: {
+    'nav.subtitle': '多平台提示词采集', 'nav.tasks': '采集任务', 'nav.notes': '提示词浏览',
+    'nav.schedules': '定时任务', 'nav.settings': '设置',
+    'dash.categories': '分类分布', 'dash.models': '模型分布', 'dash.recent': '最近采集',
+    'dash.total': '总笔记', 'dash.cats': '分类数', 'dash.mods': '模型数', 'dash.imgs': '总图片',
+    'dash.no_data': '暂无数据',
+    'col.title': '标题', 'col.category': '分类', 'col.model': '模型', 'col.images': '图片',
+    'col.time': '时间', 'col.platform': '平台', 'col.keyword': '关键词', 'col.count': '数量',
+    'col.status': '状态', 'col.start_time': '开始时间', 'col.actions': '操作',
+    'col.interval': '间隔', 'col.last_run': '上次执行', 'col.next_run': '下次执行',
+    'tasks.title': '采集任务', 'tasks.new': '新建任务', 'tasks.live_log': '实时日志',
+    'tasks.waiting': '等待任务启动...', 'tasks.history': '任务历史', 'tasks.empty': '暂无任务记录',
+    'tasks.start': '🚀 开始采集', 'tasks.running': '⏳ 采集中...', 'tasks.stop': '⏹ 停止',
+    'tasks.log': '日志', 'tasks.stop_btn': '停止', 'tasks.delete': '删除',
+    'tasks.done': '✅ 任务结束: ', 'tasks.stopped': '\n⏹ 任务已停止\n',
+    'status.running': '运行中', 'status.done': '完成', 'status.failed': '失败', 'status.stopped': '已停止',
+    'form.platform': '采集平台', 'form.keyword': '搜索关键词', 'form.keyword_ph': '如：建筑提示词',
+    'form.category': '分类标签', 'form.category_ph': '如：建筑',
+    'form.max_notes': '最大笔记数', 'form.delay': '延迟 (秒)', 'form.interval': '间隔 (小时)',
+    'notes.title': '提示词浏览', 'notes.all_cats': '全部分类', 'notes.all_models': '全部模型',
+    'notes.search_ph': '搜索标题/描述...', 'notes.no_data': '暂无数据', 'notes.no_title': '无标题',
+    'notes.prev': '上一页', 'notes.next': '下一页', 'notes.page_info': '（共 {0} 条）',
+    'sched.title': '定时任务', 'sched.new': '新建定时任务', 'sched.create_btn': '⏰ 创建定时任务',
+    'sched.list': '定时任务列表', 'sched.empty': '暂无定时任务',
+    'sched.info_title': '说明',
+    'sched.info1': '• 定时任务按设定间隔自动运行采集，已采集过的笔记会自动跳过（去重）',
+    'sched.info2': '• 服务启动后调度器自动运行，每 30 秒检查一次是否有到期任务',
+    'sched.info3': '• 每次执行会生成一条采集任务记录，可在「采集任务」页查看日志',
+    'sched.info4': '• 最小间隔 0.5 小时，建议不要设太短以免触发反爬',
+    'sched.info5': '• 可随时启用/禁用或删除定时任务',
+    'sched.enabled': '启用', 'sched.disabled': '禁用', 'sched.run_now': '立即执行',
+    'sched.never': '从未执行', 'sched.confirm_del': '确定删除此定时任务？',
+    'detail.back': '← 返回列表', 'detail.delete': '🗑 删除笔记', 'detail.raw_desc': '原始描述',
+    'detail.view_orig': '查看原文 ↗', 'detail.unknown': '未知', 'detail.no_img': '无图片',
+    'detail.no_desc': '无描述', 'detail.confirm_del': '确定删除这条笔记？',
+    'detail.params': '参数', 'detail.style_tags': '风格标签',
+    'settings.title': '设置', 'settings.save': '保存',
+    'settings.apikey_desc': '用于调用 LLM 提取结构化提示词。获取地址：<a href="https://openrouter.ai/keys" target="_blank" class="text-indigo-400 hover:text-indigo-300">openrouter.ai/keys</a>',
+    'settings.login_status': '登录状态',
+    'settings.configured': '已配置', 'settings.not_configured': '未配置',
+    'settings.not_configured_hint': '请填写 API Key 后才能使用采集功能',
+    'settings.key_empty': '请输入 API Key', 'settings.saved': '保存成功', 'settings.save_fail': '保存失败',
+    'settings.logged_in': '已登录', 'settings.not_logged_in': '未登录',
+    'settings.relogin': '🔄 重新登录', 'settings.login': '🔑 登录',
+    'settings.save_cookie': '✅ 保存 Cookie', 'settings.cancel': '取消',
+    'settings.browser_hint': '浏览器已打开，请完成登录后点击保存',
+    'settings.cookie_fail': '无法获取状态',
+    'login.not_logged_in': '未登录',
+    'platform.not_logged_in': '(未登录)',
+  },
+  en: {
+    'nav.subtitle': 'Multi-platform Prompt Collector', 'nav.tasks': 'Tasks', 'nav.notes': 'Prompts',
+    'nav.schedules': 'Schedules', 'nav.settings': 'Settings',
+    'dash.categories': 'Category Distribution', 'dash.models': 'Model Distribution', 'dash.recent': 'Recent',
+    'dash.total': 'Total Notes', 'dash.cats': 'Categories', 'dash.mods': 'Models', 'dash.imgs': 'Total Images',
+    'dash.no_data': 'No data',
+    'col.title': 'Title', 'col.category': 'Category', 'col.model': 'Model', 'col.images': 'Images',
+    'col.time': 'Time', 'col.platform': 'Platform', 'col.keyword': 'Keyword', 'col.count': 'Count',
+    'col.status': 'Status', 'col.start_time': 'Started', 'col.actions': 'Actions',
+    'col.interval': 'Interval', 'col.last_run': 'Last Run', 'col.next_run': 'Next Run',
+    'tasks.title': 'Scraping Tasks', 'tasks.new': 'New Task', 'tasks.live_log': 'Live Log',
+    'tasks.waiting': 'Waiting for task...', 'tasks.history': 'Task History', 'tasks.empty': 'No tasks yet',
+    'tasks.start': '🚀 Start', 'tasks.running': '⏳ Running...', 'tasks.stop': '⏹ Stop',
+    'tasks.log': 'Log', 'tasks.stop_btn': 'Stop', 'tasks.delete': 'Delete',
+    'tasks.done': '✅ Task finished: ', 'tasks.stopped': '\n⏹ Task stopped\n',
+    'status.running': 'Running', 'status.done': 'Done', 'status.failed': 'Failed', 'status.stopped': 'Stopped',
+    'form.platform': 'Platform', 'form.keyword': 'Search Keyword', 'form.keyword_ph': 'e.g. architecture prompts',
+    'form.category': 'Category Tag', 'form.category_ph': 'e.g. architecture',
+    'form.max_notes': 'Max Notes', 'form.delay': 'Delay (sec)', 'form.interval': 'Interval (hours)',
+    'notes.title': 'Prompt Browser', 'notes.all_cats': 'All Categories', 'notes.all_models': 'All Models',
+    'notes.search_ph': 'Search title/description...', 'notes.no_data': 'No data', 'notes.no_title': 'Untitled',
+    'notes.prev': 'Prev', 'notes.next': 'Next', 'notes.page_info': '({0} total)',
+    'sched.title': 'Scheduled Tasks', 'sched.new': 'New Schedule', 'sched.create_btn': '⏰ Create Schedule',
+    'sched.list': 'Schedule List', 'sched.empty': 'No schedules yet',
+    'sched.info_title': 'Info',
+    'sched.info1': '• Schedules run scraping automatically at set intervals, skipping already collected notes',
+    'sched.info2': '• The scheduler checks for due tasks every 30 seconds after startup',
+    'sched.info3': '• Each run creates a task record viewable in the Tasks page',
+    'sched.info4': '• Minimum interval is 0.5 hours; avoid setting too short to prevent rate limiting',
+    'sched.info5': '• You can enable/disable or delete schedules at any time',
+    'sched.enabled': 'Enabled', 'sched.disabled': 'Disabled', 'sched.run_now': 'Run Now',
+    'sched.never': 'Never', 'sched.confirm_del': 'Delete this schedule?',
+    'detail.back': '← Back', 'detail.delete': '🗑 Delete', 'detail.raw_desc': 'Raw Description',
+    'detail.view_orig': 'View Original ↗', 'detail.unknown': 'Unknown', 'detail.no_img': 'No images',
+    'detail.no_desc': 'No description', 'detail.confirm_del': 'Delete this note?',
+    'detail.params': 'Parameters', 'detail.style_tags': 'Style Tags',
+    'settings.title': 'Settings', 'settings.save': 'Save',
+    'settings.apikey_desc': 'Used for LLM prompt extraction. Get yours at <a href="https://openrouter.ai/keys" target="_blank" class="text-indigo-400 hover:text-indigo-300">openrouter.ai/keys</a>',
+    'settings.login_status': 'Login Status',
+    'settings.configured': 'Configured', 'settings.not_configured': 'Not Configured',
+    'settings.not_configured_hint': 'Please set an API Key to enable scraping',
+    'settings.key_empty': 'Please enter an API Key', 'settings.saved': 'Saved', 'settings.save_fail': 'Save failed',
+    'settings.logged_in': 'Logged in', 'settings.not_logged_in': 'Not logged in',
+    'settings.relogin': '🔄 Re-login', 'settings.login': '🔑 Login',
+    'settings.save_cookie': '✅ Save Cookie', 'settings.cancel': 'Cancel',
+    'settings.browser_hint': 'Browser opened. Log in then click Save.',
+    'settings.cookie_fail': 'Unable to get status',
+    'login.not_logged_in': 'Not logged in',
+    'platform.not_logged_in': '(not logged in)',
+  }
+};
+
+let _lang = localStorage.getItem('lang') || 'zh';
+
+function t(key) { return (I18N[_lang] || I18N.zh)[key] || (I18N.zh)[key] || key; }
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  document.getElementById('lang-label').textContent = _lang === 'zh' ? 'EN' : '中文';
+}
+
+function toggleLang() {
+  _lang = _lang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('lang', _lang);
+  applyI18n();
+  // Re-render dynamic content
+  const hash = location.hash || '#dashboard';
+  if (hash === '#dashboard') loadDashboard();
+  if (hash === '#tasks') { loadTaskHistory(); }
+  if (hash === '#notes') { loadFilters(); loadNotes(); }
+  if (hash === '#schedules') { loadSchedules(); }
+  if (hash === '#settings') loadSettings();
+}
+
 // ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
@@ -346,10 +479,10 @@ async function api(path) { return (await fetch('/api' + path)).json(); }
 async function loadDashboard() {
   const d = await api('/stats');
   const cards = [
-    { label: '总笔记', value: d.total, color: 'indigo' },
-    { label: '分类数', value: d.categories.length, color: 'emerald' },
-    { label: '模型数', value: d.models.length, color: 'amber' },
-    { label: '总图片', value: d.total_images, color: 'rose' },
+    { label: t('dash.total'), value: d.total, color: 'indigo' },
+    { label: t('dash.cats'), value: d.categories.length, color: 'emerald' },
+    { label: t('dash.mods'), value: d.models.length, color: 'amber' },
+    { label: t('dash.imgs'), value: d.total_images, color: 'rose' },
   ];
   document.getElementById('stats-cards').innerHTML = cards.map(c => `
     <div class="bg-card rounded-xl border border-border p-5 glow-card">
@@ -363,7 +496,7 @@ async function loadDashboard() {
 
   document.getElementById('recent-table').innerHTML = d.recent.map(n => `
     <tr class="border-b border-border hover:bg-white/[0.03] cursor-pointer" onclick="location.hash='#note/${n.note_id}'">
-      <td class="py-2.5 text-gray-300">${esc(n.title || '无标题').slice(0, 30)}</td>
+      <td class="py-2.5 text-gray-300">${esc(n.title || t('notes.no_title')).slice(0, 30)}</td>
       <td><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(n.category)}</span></td>
       <td><span class="bg-emerald-500/20 text-emerald-400 badge">${esc(n.model || '-')}</span></td>
       <td class="text-gray-400">${n.image_count}</td>
@@ -382,7 +515,7 @@ function renderBar(id, items, color) {
       </div>
       <span class="text-sm text-muted w-8">${i.count}</span>
     </div>
-  `).join('') || '<p class="text-sm text-muted">暂无数据</p>';
+  `).join('') || `<p class="text-sm text-muted">${t('dash.no_data')}</p>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +537,7 @@ async function initTaskPage() {
 
     const btn = document.getElementById('task-btn');
     btn.disabled = true;
-    btn.textContent = '⏳ 采集中...';
+    btn.textContent = t('tasks.running');
     document.getElementById('stop-btn').classList.remove('hidden');
     const terminal = document.getElementById('log-terminal');
     terminal.textContent = '';
@@ -417,7 +550,7 @@ async function initTaskPage() {
     if (res.error) {
       terminal.textContent = '❌ ' + res.error;
       btn.disabled = false;
-      btn.textContent = '🚀 开始采集';
+      btn.textContent = t('tasks.start');
       document.getElementById('stop-btn').classList.add('hidden');
       return;
     }
@@ -432,10 +565,10 @@ async function initTaskPage() {
       terminal.scrollTop = terminal.scrollHeight;
     };
     taskEventSource.addEventListener('done', (e) => {
-      terminal.textContent += '\n✅ 任务结束: ' + e.data + '\n';
+      terminal.textContent += '\n' + t('tasks.done') + e.data + '\n';
       taskEventSource.close();
       btn.disabled = false;
-      btn.textContent = '🚀 开始采集';
+      btn.textContent = t('tasks.start');
       document.getElementById('stop-btn').classList.add('hidden');
       currentTaskId = null;
       loadTaskHistory();
@@ -443,7 +576,7 @@ async function initTaskPage() {
     taskEventSource.onerror = () => {
       taskEventSource.close();
       btn.disabled = false;
-      btn.textContent = '🚀 开始采集';
+      btn.textContent = t('tasks.start');
       document.getElementById('stop-btn').classList.add('hidden');
       currentTaskId = null;
     };
@@ -453,7 +586,7 @@ async function initTaskPage() {
 async function stopCurrentTask() {
   if (!currentTaskId) return;
   await fetch('/api/tasks/' + currentTaskId + '/stop', { method: 'POST' });
-  document.getElementById('log-terminal').textContent += '\n⏹ 任务已停止\n';
+  document.getElementById('log-terminal').textContent += t('tasks.stopped');
   document.getElementById('task-btn').disabled = false;
   document.getElementById('task-btn').textContent = '🚀 开始采集';
   document.getElementById('stop-btn').classList.add('hidden');
@@ -501,26 +634,27 @@ async function loadTaskHistory() {
   }
   empty.classList.add('hidden');
   const statusMap = {
-    running: '<span class="bg-blue-500/20 text-blue-400 badge">运行中</span>',
-    done: '<span class="bg-emerald-500/20 text-emerald-400 badge">完成</span>',
-    failed: '<span class="bg-red-500/20 text-red-400 badge">失败</span>',
-    stopped: '<span class="bg-amber-500/20 text-amber-400 badge">已停止</span>',
+    running: `<span class="bg-blue-500/20 text-blue-400 badge">${t('status.running')}</span>`,
+    done: `<span class="bg-emerald-500/20 text-emerald-400 badge">${t('status.done')}</span>`,
+    failed: `<span class="bg-red-500/20 text-red-400 badge">${t('status.failed')}</span>`,
+    stopped: `<span class="bg-amber-500/20 text-amber-400 badge">${t('status.stopped')}</span>`,
   };
-  tbody.innerHTML = tasks.map(t => `
+  const _t = t; // save ref since 't' is used as loop variable below
+  tbody.innerHTML = tasks.map(tk => `
     <tr class="border-b border-border hover:bg-white/[0.03]">
-      <td class="py-2 text-gray-500 font-mono text-xs">${esc(t.id)}</td>
-      <td class="py-2"><span class="bg-purple-500/20 text-purple-400 badge">${platformLabel(t.platform)}</span></td>
-      <td class="py-2 text-gray-300">${esc(t.keyword)}</td>
-      <td class="py-2"><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(t.category)}</span></td>
-      <td class="py-2 text-gray-400">${t.max_notes || '-'}</td>
-      <td class="py-2">${statusMap[t.status] || t.status}</td>
-      <td class="py-2 text-muted text-xs">${esc(t.started_at || '')}</td>
+      <td class="py-2 text-gray-500 font-mono text-xs">${esc(tk.id)}</td>
+      <td class="py-2"><span class="bg-purple-500/20 text-purple-400 badge">${platformLabel(tk.platform)}</span></td>
+      <td class="py-2 text-gray-300">${esc(tk.keyword)}</td>
+      <td class="py-2"><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(tk.category)}</span></td>
+      <td class="py-2 text-gray-400">${tk.max_notes || '-'}</td>
+      <td class="py-2">${statusMap[tk.status] || tk.status}</td>
+      <td class="py-2 text-muted text-xs">${esc(tk.started_at || '')}</td>
       <td class="py-2">
         <div class="flex gap-2">
-          <button onclick="viewTaskLog('${t.id}')" class="text-xs text-indigo-400 hover:text-indigo-300">日志</button>
-          ${t.status === 'running'
-            ? `<button onclick="fetch('/api/tasks/${t.id}/stop',{method:'POST'}).then(()=>loadTaskHistory())" class="text-xs text-amber-400 hover:text-amber-300">停止</button>`
-            : `<button onclick="deleteTask('${t.id}')" class="text-xs text-red-400 hover:text-red-300">删除</button>`}
+          <button onclick="viewTaskLog('${tk.id}')" class="text-xs text-indigo-400 hover:text-indigo-300">${_t('tasks.log')}</button>
+          ${tk.status === 'running'
+            ? `<button onclick="fetch('/api/tasks/${tk.id}/stop',{method:'POST'}).then(()=>loadTaskHistory())" class="text-xs text-amber-400 hover:text-amber-300">${_t('tasks.stop_btn')}</button>`
+            : `<button onclick="deleteTask('${tk.id}')" class="text-xs text-red-400 hover:text-red-300">${_t('tasks.delete')}</button>`}
         </div>
       </td>
     </tr>
@@ -573,19 +707,19 @@ async function loadSchedules() {
       <td class="py-2.5 text-gray-400">${s.interval_hours}h</td>
       <td class="py-2.5">
         ${s.enabled
-          ? '<span class="bg-emerald-500/20 text-emerald-400 badge">启用</span>'
-          : '<span class="bg-gray-500/20 text-gray-400 badge">禁用</span>'}
+          ? `<span class="bg-emerald-500/20 text-emerald-400 badge">${t('sched.enabled')}</span>`
+          : `<span class="bg-gray-500/20 text-gray-400 badge">${t('sched.disabled')}</span>`}
       </td>
-      <td class="py-2.5 text-muted text-xs">${esc(s.last_run_at || '从未执行')}</td>
+      <td class="py-2.5 text-muted text-xs">${esc(s.last_run_at || t('sched.never'))}</td>
       <td class="py-2.5 text-muted text-xs">${s.enabled ? esc(s.next_run_at || '-') : '-'}</td>
       <td class="py-2.5">
         <div class="flex gap-2">
           <button onclick="toggleSchedule('${s.schedule_id}', ${s.enabled ? 0 : 1})"
             class="text-xs ${s.enabled ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'}">
-            ${s.enabled ? '禁用' : '启用'}
+            ${s.enabled ? t('sched.disabled') : t('sched.enabled')}
           </button>
-          <button onclick="runScheduleNow('${s.schedule_id}')" class="text-xs text-blue-400 hover:text-blue-300">立即执行</button>
-          <button onclick="deleteSchedule('${s.schedule_id}')" class="text-xs text-red-400 hover:text-red-300">删除</button>
+          <button onclick="runScheduleNow('${s.schedule_id}')" class="text-xs text-blue-400 hover:text-blue-300">${t('sched.run_now')}</button>
+          <button onclick="deleteSchedule('${s.schedule_id}')" class="text-xs text-red-400 hover:text-red-300">${t('tasks.delete')}</button>
         </div>
       </td>
     </tr>
@@ -610,7 +744,7 @@ async function runScheduleNow(id) {
 }
 
 async function deleteSchedule(id) {
-  if (!confirm('确定删除此定时任务？')) return;
+  if (!confirm(t('sched.confirm_del'))) return;
   await fetch('/api/schedules/' + id, { method: 'DELETE' });
   loadSchedules();
 }
@@ -639,7 +773,7 @@ async function loadNotes() {
         ? `<img src="/api/image-proxy?url=${encodeURIComponent(n.thumbnail)}" class="w-full h-48 object-cover" loading="lazy" onerror="this.style.display='none'">`
         : `<div class="w-full h-48 bg-white/[0.02] flex items-center justify-center text-gray-700 text-3xl">🖼</div>`}
       <div class="p-4">
-        <h3 class="text-sm font-medium mb-2 line-clamp-2 text-gray-200">${esc(n.title || '无标题')}</h3>
+        <h3 class="text-sm font-medium mb-2 line-clamp-2 text-gray-200">${esc(n.title || t('notes.no_title'))}</h3>
         <div class="flex items-center gap-2 flex-wrap">
           <span class="bg-indigo-500/20 text-indigo-400 badge">${esc(n.category)}</span>
           ${n.model ? `<span class="bg-emerald-500/20 text-emerald-400 badge">${esc(n.model)}</span>` : ''}
@@ -648,13 +782,13 @@ async function loadNotes() {
         <p class="text-xs text-muted mt-2">${esc(n.author_name || '')} · ${(n.created_at || '').slice(0, 10)}</p>
       </div>
     </a>
-  `).join('') || '<p class="text-muted col-span-3 text-center py-12">暂无数据</p>';
+  `).join('') || `<p class="text-muted col-span-3 text-center py-12">${t('notes.no_data')}</p>`;
 
   const totalPages = Math.ceil(d.total / d.per_page) || 1;
   document.getElementById('notes-pagination').innerHTML = `
-    <button onclick="notesPage=Math.max(1,notesPage-1);loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage <= 1 ? 'opacity-30 pointer-events-none' : 'hover:bg-white/[0.03]'}" ${notesPage <= 1 ? 'disabled' : ''}>上一页</button>
-    <span class="text-sm text-muted">${notesPage} / ${totalPages}（共 ${d.total} 条）</span>
-    <button onclick="notesPage++;loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage >= totalPages ? 'opacity-30 pointer-events-none' : 'hover:bg-white/[0.03]'}" ${notesPage >= totalPages ? 'disabled' : ''}>下一页</button>
+    <button onclick="notesPage=Math.max(1,notesPage-1);loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage <= 1 ? 'opacity-30 pointer-events-none' : 'hover:bg-white/[0.03]'}" ${notesPage <= 1 ? 'disabled' : ''}>${t('notes.prev')}</button>
+    <span class="text-sm text-muted">${notesPage} / ${totalPages} ${t('notes.page_info').replace('{0}', d.total)}</span>
+    <button onclick="notesPage++;loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage >= totalPages ? 'opacity-30 pointer-events-none' : 'hover:bg-white/[0.03]'}" ${notesPage >= totalPages ? 'disabled' : ''}>${t('notes.next')}</button>
   `;
 }
 
@@ -663,8 +797,8 @@ async function loadFilters() {
   const models = await api('/models');
   const catSel = document.getElementById('filter-category');
   const modSel = document.getElementById('filter-model');
-  catSel.innerHTML = '<option value="">全部分类</option>';
-  modSel.innerHTML = '<option value="">全部模型</option>';
+  catSel.innerHTML = `<option value="">${t('notes.all_cats')}</option>`;
+  modSel.innerHTML = `<option value="">${t('notes.all_models')}</option>`;
   cats.forEach(c => catSel.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`);
   models.forEach(m => modSel.innerHTML += `<option value="${esc(m)}">${esc(m)}</option>`);
 }
@@ -684,10 +818,10 @@ async function loadDetail(noteId) {
   const n = await api('/notes/' + noteId);
   if (n.error) return;
 
-  document.getElementById('detail-title').textContent = n.title || '无标题';
+  document.getElementById('detail-title').textContent = n.title || t('notes.no_title');
 
   document.getElementById('delete-note-btn').onclick = async () => {
-    if (!confirm('确定删除这条笔记？')) return;
+    if (!confirm(t('detail.confirm_del'))) return;
     await fetch('/api/notes/' + noteId, { method: 'DELETE' });
     location.hash = '#notes';
   };
@@ -695,9 +829,9 @@ async function loadDetail(noteId) {
   document.getElementById('detail-meta').innerHTML = `
     <span class="bg-indigo-500/20 text-indigo-400 badge">${esc(n.category)}</span>
     ${n.prompt?.model ? `<span class="bg-emerald-500/20 text-emerald-400 badge">${esc(n.prompt.model)}</span>` : ''}
-    <span class="text-xs text-muted">👤 ${esc(n.author_name || '未知')}</span>
+    <span class="text-xs text-muted">👤 ${esc(n.author_name || t('detail.unknown'))}</span>
     <span class="text-xs text-muted">📅 ${esc(n.publish_time || n.created_at?.slice(0, 10) || '')}</span>
-    <a href="${esc(n.url)}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 ml-auto">查看原文 ↗</a>
+    <a href="${esc(n.url)}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 ml-auto">${t('detail.view_orig')}</a>
   `;
 
   document.getElementById('detail-images').innerHTML = (n.images || []).map(img => `
@@ -705,17 +839,17 @@ async function loadDetail(noteId) {
          class="w-full aspect-square object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity border border-border"
          loading="lazy" onclick="openLightbox(this.src)"
          onerror="this.style.display='none'">
-  `).join('') || '<p class="text-muted col-span-3">无图片</p>';
+  `).join('') || `<p class="text-muted col-span-3">${t('detail.no_img')}</p>`;
 
   const p = n.prompt || {};
   document.getElementById('detail-prompt').innerHTML = `
     ${p.prompt_en ? `<div><label class="text-xs text-muted">English Prompt</label><p class="text-sm bg-white/[0.03] p-3 rounded-lg mt-1 font-mono text-gray-300 border border-border">${esc(p.prompt_en)}</p></div>` : ''}
     ${p.prompt_cn ? `<div><label class="text-xs text-muted">中文提示词</label><p class="text-sm bg-white/[0.03] p-3 rounded-lg mt-1 text-gray-300 border border-border">${esc(p.prompt_cn)}</p></div>` : ''}
-    ${p.parameters ? `<div><label class="text-xs text-muted">参数</label><p class="text-sm font-mono text-gray-400 mt-1">${esc(p.parameters)}</p></div>` : ''}
-    ${p.style_tags?.length ? `<div><label class="text-xs text-muted">风格标签</label><div class="flex gap-1.5 flex-wrap mt-1">${p.style_tags.map(t => `<span class="bg-amber-500/20 text-amber-400 badge">${esc(t)}</span>`).join('')}</div></div>` : ''}
+    ${p.parameters ? `<div><label class="text-xs text-muted">${t('detail.params')}</label><p class="text-sm font-mono text-gray-400 mt-1">${esc(p.parameters)}</p></div>` : ''}
+    ${p.style_tags?.length ? `<div><label class="text-xs text-muted">${t('detail.style_tags')}</label><div class="flex gap-1.5 flex-wrap mt-1">${p.style_tags.map(tag => `<span class="bg-amber-500/20 text-amber-400 badge">${esc(tag)}</span>`).join('')}</div></div>` : ''}
   `;
 
-  document.getElementById('detail-desc').textContent = n.description || '无描述';
+  document.getElementById('detail-desc').textContent = n.description || t('detail.no_desc');
 }
 
 function openLightbox(src) {
@@ -738,9 +872,9 @@ async function loadSettings() {
   const d = await api('/settings');
   const status = document.getElementById('apikey-status');
   if (d.api_key_set) {
-    status.innerHTML = `<span class="inline-flex items-center gap-2 text-sm"><span class="bg-emerald-500/20 text-emerald-400 badge">已配置</span><span class="text-gray-500 font-mono text-xs">${esc(d.api_key_masked)}</span></span>`;
+    status.innerHTML = `<span class="inline-flex items-center gap-2 text-sm"><span class="bg-emerald-500/20 text-emerald-400 badge">${t('settings.configured')}</span><span class="text-gray-500 font-mono text-xs">${esc(d.api_key_masked)}</span></span>`;
   } else {
-    status.innerHTML = '<span class="bg-red-500/20 text-red-400 badge">未配置</span><span class="text-xs text-gray-500 ml-2">请填写 API Key 后才能使用采集功能</span>';
+    status.innerHTML = `<span class="bg-red-500/20 text-red-400 badge">${t('settings.not_configured')}</span><span class="text-xs text-gray-500 ml-2">${t('settings.not_configured_hint')}</span>`;
   }
   // Cookie status for all platforms with login buttons
   const cookie = document.getElementById('cookie-status');
@@ -758,38 +892,38 @@ async function loadSettings() {
     cookie.innerHTML = Object.entries(cs).map(([key, p]) => {
       const ls = loginStates[key] || { active: false };
       const loginBtn = ls.active
-        ? `<button onclick="saveLoginCookie('${key}')" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs hover:bg-emerald-500 transition-colors">✅ 保存 Cookie</button>
-           <button onclick="cancelLogin('${key}')" class="px-3 py-1 bg-red-600/50 text-red-300 rounded-lg text-xs hover:bg-red-600 transition-colors">取消</button>
-           <span class="text-xs text-amber-400 ml-1">浏览器已打开，请完成登录后点击保存</span>`
-        : `<button onclick="startLogin('${key}')" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-500 transition-colors">${p.exists ? '🔄 重新登录' : '🔑 登录'}</button>`;
+        ? `<button onclick="saveLoginCookie('${key}')" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs hover:bg-emerald-500 transition-colors">${t('settings.save_cookie')}</button>
+           <button onclick="cancelLogin('${key}')" class="px-3 py-1 bg-red-600/50 text-red-300 rounded-lg text-xs hover:bg-red-600 transition-colors">${t('settings.cancel')}</button>
+           <span class="text-xs text-amber-400 ml-1">${t('settings.browser_hint')}</span>`
+        : `<button onclick="startLogin('${key}')" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-500 transition-colors">${p.exists ? t('settings.relogin') : t('settings.login')}</button>`;
       return `
         <div class="flex items-center gap-2 mb-3 flex-wrap">
           <span class="text-sm text-gray-300 w-28">${esc(p.name)}</span>
           ${p.exists
-            ? `<span class="bg-emerald-500/20 text-emerald-400 badge">已登录</span><span class="text-xs text-gray-500">Cookie（${p.size}）</span>`
-            : `<span class="bg-red-500/20 text-red-400 badge">未登录</span>`}
+            ? `<span class="bg-emerald-500/20 text-emerald-400 badge">${t('settings.logged_in')}</span><span class="text-xs text-gray-500">Cookie（${p.size}）</span>`
+            : `<span class="bg-red-500/20 text-red-400 badge">${t('settings.not_logged_in')}</span>`}
           ${loginBtn}
         </div>`;
     }).join('');
-  } catch(e) { cookie.textContent = '无法获取状态'; }
+  } catch(e) { cookie.textContent = t('settings.cookie_fail'); }
 }
 
 async function saveApiKey() {
   const input = document.getElementById('apikey-input');
   const msg = document.getElementById('apikey-msg');
   const key = input.value.trim();
-  if (!key) { msg.textContent = '请输入 API Key'; msg.className = 'text-xs mt-2 text-red-400'; msg.classList.remove('hidden'); return; }
+  if (!key) { msg.textContent = t('settings.key_empty'); msg.className = 'text-xs mt-2 text-red-400'; msg.classList.remove('hidden'); return; }
   const res = await (await fetch('/api/settings', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ api_key: key }),
   })).json();
   if (res.ok) {
-    msg.textContent = '保存成功'; msg.className = 'text-xs mt-2 text-emerald-400'; msg.classList.remove('hidden');
+    msg.textContent = t('settings.saved'); msg.className = 'text-xs mt-2 text-emerald-400'; msg.classList.remove('hidden');
     input.value = '';
     loadSettings();
     setTimeout(() => msg.classList.add('hidden'), 3000);
   } else {
-    msg.textContent = res.error || '保存失败'; msg.className = 'text-xs mt-2 text-red-400'; msg.classList.remove('hidden');
+    msg.textContent = res.error || t('settings.save_fail'); msg.className = 'text-xs mt-2 text-red-400'; msg.classList.remove('hidden');
   }
 }
 
@@ -841,7 +975,7 @@ async function fillPlatformSelect(selectId) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
   sel.innerHTML = platforms.map(p =>
-    `<option value="${esc(p.id)}">${esc(p.name)}${p.cookie_exists ? '' : ' (未登录)'}</option>`
+    `<option value="${esc(p.id)}">${esc(p.name)}${p.cookie_exists ? '' : ' ' + t('platform.not_logged_in')}</option>`
   ).join('');
 }
 
@@ -858,6 +992,7 @@ function esc(s) {
 // Init
 // ---------------------------------------------------------------------------
 window.addEventListener('hashchange', route);
+applyI18n();
 route();
 </script>
 </body>
