@@ -12,7 +12,7 @@ wheels/
 # XHS data
 images/
 *.db
-xhs_auth.json
+*_auth.json
 
 # Secrets
 .env

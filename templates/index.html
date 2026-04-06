@@ -85,6 +85,12 @@
             <h3 class="text-sm font-medium text-muted mb-4">新建任务</h3>
             <form id="task-form" class="space-y-4">
               <div>
+                <label class="block text-sm text-gray-400 mb-1">采集平台</label>
+                <select name="platform" id="task-platform"
+                  class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </select>
+              </div>
+              <div>
                 <label class="block text-sm text-gray-400 mb-1">搜索关键词</label>
                 <input name="keyword" type="text" placeholder="如：建筑提示词" required
                   class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
@@ -129,7 +135,7 @@
           <h3 class="text-sm font-medium text-muted mb-4">任务历史</h3>
           <table class="w-full text-sm">
             <thead><tr class="text-left text-muted border-b border-border">
-              <th class="pb-2">ID</th><th class="pb-2">关键词</th><th class="pb-2">分类</th>
+              <th class="pb-2">ID</th><th class="pb-2">平台</th><th class="pb-2">关键词</th><th class="pb-2">分类</th>
               <th class="pb-2">数量</th><th class="pb-2">状态</th><th class="pb-2">开始时间</th>
               <th class="pb-2">操作</th>
             </tr></thead>
@@ -166,6 +172,12 @@
           <div class="bg-card rounded-xl border border-border p-6 col-span-1">
             <h3 class="text-sm font-medium text-muted mb-4">新建定时任务</h3>
             <form id="schedule-form" class="space-y-3">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">采集平台</label>
+                <select name="platform" id="schedule-platform"
+                  class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </select>
+              </div>
               <div>
                 <label class="block text-sm text-gray-400 mb-1">搜索关键词</label>
                 <input name="keyword" type="text" placeholder="如：建筑提示词" required
@@ -211,7 +223,7 @@
           <h3 class="text-sm font-medium text-muted mb-4">定时任务列表</h3>
           <table class="w-full text-sm">
             <thead><tr class="text-left text-muted border-b border-border">
-              <th class="pb-2">关键词</th><th class="pb-2">分类</th><th class="pb-2">数量</th>
+              <th class="pb-2">平台</th><th class="pb-2">关键词</th><th class="pb-2">分类</th><th class="pb-2">数量</th>
               <th class="pb-2">间隔</th><th class="pb-2">状态</th>
               <th class="pb-2">上次执行</th><th class="pb-2">下次执行</th><th class="pb-2">操作</th>
             </tr></thead>
@@ -375,7 +387,8 @@ function renderBar(id, items, color) {
 let taskEventSource = null;
 let currentTaskId = null;
 
-function initTaskPage() {
+async function initTaskPage() {
+  await fillPlatformSelect('task-platform');
   loadTaskHistory();
   const form = document.getElementById('task-form');
   form.onsubmit = async (e) => {
@@ -492,6 +505,7 @@ async function loadTaskHistory() {
   tbody.innerHTML = tasks.map(t => `
     <tr class="border-b border-border hover:bg-white/5">
       <td class="py-2 text-gray-500 font-mono text-xs">${esc(t.id)}</td>
+      <td class="py-2"><span class="bg-purple-500/20 text-purple-400 badge">${platformLabel(t.platform)}</span></td>
       <td class="py-2 text-gray-300">${esc(t.keyword)}</td>
       <td class="py-2"><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(t.category)}</span></td>
       <td class="py-2 text-gray-400">${t.max_notes || '-'}</td>
@@ -512,7 +526,8 @@ async function loadTaskHistory() {
 // ---------------------------------------------------------------------------
 // Schedules
 // ---------------------------------------------------------------------------
-function initSchedulePage() {
+async function initSchedulePage() {
+  await fillPlatformSelect('schedule-platform');
   loadSchedules();
   const form = document.getElementById('schedule-form');
   form.onsubmit = async (e) => {
@@ -522,6 +537,7 @@ function initSchedulePage() {
     body.max_notes = parseInt(body.max_notes);
     body.interval_hours = parseFloat(body.interval_hours);
     body.delay = 3;
+    // platform is already in FormData from the select
     const res = await (await fetch('/api/schedules', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -546,6 +562,7 @@ async function loadSchedules() {
   empty.classList.add('hidden');
   tbody.innerHTML = schedules.map(s => `
     <tr class="border-b border-border hover:bg-white/5">
+      <td class="py-2.5"><span class="bg-purple-500/20 text-purple-400 badge">${platformLabel(s.platform)}</span></td>
       <td class="py-2.5 text-gray-300">${esc(s.keyword)}</td>
       <td class="py-2.5"><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(s.category)}</span></td>
       <td class="py-2.5 text-gray-400">${s.max_notes}</td>
@@ -721,14 +738,19 @@ async function loadSettings() {
   } else {
     status.innerHTML = '<span class="bg-red-500/20 text-red-400 badge">未配置</span><span class="text-xs text-gray-500 ml-2">请填写 API Key 后才能使用采集功能</span>';
   }
-  // Cookie status
+  // Cookie status for all platforms
   const cookie = document.getElementById('cookie-status');
   try {
     const resp = await fetch('/api/cookie-status');
     const cs = await resp.json();
-    cookie.innerHTML = cs.exists
-      ? `<span class="bg-emerald-500/20 text-emerald-400 badge">已登录</span><span class="text-xs text-gray-500 ml-2">Cookie 文件存在（${cs.size}）</span>`
-      : '<span class="bg-red-500/20 text-red-400 badge">未登录</span><span class="text-xs text-gray-500 ml-2">请在终端运行 <code class="bg-surface px-1.5 py-0.5 rounded text-indigo-400">uv run save_login.py</code></span>';
+    cookie.innerHTML = Object.entries(cs).map(([key, p]) => `
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-sm text-gray-300 w-24">${esc(p.name)}</span>
+        ${p.exists
+          ? `<span class="bg-emerald-500/20 text-emerald-400 badge">已登录</span><span class="text-xs text-gray-500 ml-1">Cookie（${p.size}）</span>`
+          : `<span class="bg-red-500/20 text-red-400 badge">未登录</span><span class="text-xs text-gray-500 ml-1">请运行 <code class="bg-surface px-1.5 py-0.5 rounded text-indigo-400">uv run ${esc(p.login_script)}</code></span>`}
+      </div>
+    `).join('');
   } catch(e) { cookie.textContent = '无法获取状态'; }
 }
 
@@ -754,6 +776,29 @@ async function saveApiKey() {
 function toggleKeyVisibility() {
   const input = document.getElementById('apikey-input');
   input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+// ---------------------------------------------------------------------------
+// Platforms
+// ---------------------------------------------------------------------------
+const PLATFORM_LABELS = { xhs: '小红书', x: 'X (Twitter)' };
+let _platforms = null;
+
+function platformLabel(p) { return PLATFORM_LABELS[p] || p || '小红书'; }
+
+async function loadPlatforms() {
+  if (_platforms) return _platforms;
+  _platforms = await api('/platforms');
+  return _platforms;
+}
+
+async function fillPlatformSelect(selectId) {
+  const platforms = await loadPlatforms();
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = platforms.map(p =>
+    `<option value="${esc(p.id)}">${esc(p.name)}${p.cookie_exists ? '' : ' (未登录)'}</option>`
+  ).join('');
 }
 
 // ---------------------------------------------------------------------------

@@ -22,9 +22,22 @@ app = FastAPI(title="AIGC Prompt Collector")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 DB_PATH = str(Path(__file__).parent / "xhs_notes.db")
-COOKIE_FILE = Path(__file__).parent / "xhs_auth.json"
 ENV_FILE = Path(__file__).parent / ".env"
-SCRAPER_PATH = str(Path(__file__).parent / "download_xhs_prompt.py")
+
+PLATFORMS = {
+    "xhs": {
+        "name": "小红书",
+        "scraper": str(Path(__file__).parent / "download_xhs_prompt.py"),
+        "cookie": Path(__file__).parent / "xhs_auth.json",
+        "login_script": "save_login.py",
+    },
+    "x": {
+        "name": "X (Twitter)",
+        "scraper": str(Path(__file__).parent / "download_x_prompt.py"),
+        "cookie": Path(__file__).parent / "x_auth.json",
+        "login_script": "save_login_x.py",
+    },
+}
 
 # In-memory runtime state for running tasks (process handle + live logs)
 _running: dict[str, dict] = {}
@@ -75,6 +88,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     delay    REAL DEFAULT 3,
     status   TEXT NOT NULL DEFAULT 'running',
     logs     TEXT DEFAULT '',
+    platform TEXT DEFAULT 'xhs',
     started_at  TEXT,
     finished_at TEXT
 );
@@ -86,6 +100,7 @@ CREATE TABLE IF NOT EXISTS schedules (
     delay          REAL DEFAULT 3,
     interval_hours REAL NOT NULL DEFAULT 24,
     enabled        INTEGER DEFAULT 1,
+    platform       TEXT DEFAULT 'xhs',
     last_run_at    TEXT,
     next_run_at    TEXT,
     created_at     TEXT DEFAULT (datetime('now'))
@@ -233,10 +248,17 @@ async def get_note(note_id: str):
 @app.get("/api/image-proxy")
 async def image_proxy(url: str):
     try:
+        # Choose Referer based on image domain
+        if "pbs.twimg.com" in url or "twimg.com" in url:
+            referer = "https://x.com/"
+            req_url = url  # Keep full URL with quality params for Twitter
+        else:
+            referer = "https://www.xiaohongshu.com/"
+            req_url = url.split("?")[0]
         resp = await _http_client.get(
-            url.split("?")[0],
+            req_url,
             headers={
-                "Referer": "https://www.xiaohongshu.com/",
+                "Referer": referer,
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             },
             follow_redirects=True, timeout=15,
@@ -264,16 +286,17 @@ def _save_task(task_id: str, **fields):
         db.commit()
 
 
-async def _launch_scraper(keyword: str, category: str, max_notes: int, delay: float) -> str:
+async def _launch_scraper(keyword: str, category: str, max_notes: int, delay: float, platform: str = "xhs") -> str:
     """Shared logic: persist task to DB, launch subprocess, stream logs. Returns task_id."""
     task_id = str(uuid.uuid4())[:8]
     started_at = _now()
+    scraper_path = PLATFORMS[platform]["scraper"]
 
     with get_db() as db:
         db.execute(
-            """INSERT INTO tasks (task_id, keyword, category, max_notes, delay, status, logs, started_at)
-               VALUES (?, ?, ?, ?, ?, 'running', '', ?)""",
-            (task_id, keyword, category, max_notes, delay, started_at),
+            """INSERT INTO tasks (task_id, keyword, category, max_notes, delay, status, logs, started_at, platform)
+               VALUES (?, ?, ?, ?, ?, 'running', '', ?, ?)""",
+            (task_id, keyword, category, max_notes, delay, started_at, platform),
         )
         db.commit()
 
@@ -282,7 +305,7 @@ async def _launch_scraper(keyword: str, category: str, max_notes: int, delay: fl
 
     async def run():
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, SCRAPER_PATH,
+            sys.executable, scraper_path,
             "--keyword", keyword, "--category", category,
             "--max-notes", str(max_notes), "--delay", str(delay), "--headless",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
@@ -322,10 +345,28 @@ async def _on_shutdown():
         _http_client = None
 
 
+@app.get("/api/platforms")
+async def list_platforms():
+    result = []
+    for key, cfg in PLATFORMS.items():
+        result.append({
+            "id": key,
+            "name": cfg["name"],
+            "cookie_exists": cfg["cookie"].exists(),
+            "login_script": cfg["login_script"],
+        })
+    return result
+
+
 @app.post("/api/tasks")
 async def create_task(body: dict):
-    if not COOKIE_FILE.exists():
-        return {"error": "未找到 xhs_auth.json，请先运行 save_login.py"}
+    platform = body.get("platform", "xhs")
+    if platform not in PLATFORMS:
+        return {"error": f"不支持的平台: {platform}"}
+
+    pcfg = PLATFORMS[platform]
+    if not pcfg["cookie"].exists():
+        return {"error": f"未找到 {pcfg['cookie'].name}，请先运行 uv run {pcfg['login_script']}"}
 
     keyword = body.get("keyword", "")
     category = body.get("category", "")
@@ -334,7 +375,7 @@ async def create_task(body: dict):
 
     max_notes = body.get("max_notes", 20)
     delay = body.get("delay", 3)
-    task_id = await _launch_scraper(keyword, category, max_notes, delay)
+    task_id = await _launch_scraper(keyword, category, max_notes, delay, platform)
     return {"task_id": task_id}
 
 
@@ -372,13 +413,13 @@ async def task_logs(task_id: str):
 async def list_tasks():
     with get_db() as db:
         rows = dict_rows(db.execute(
-            "SELECT task_id, keyword, category, max_notes, status, started_at, finished_at FROM tasks ORDER BY started_at DESC"
+            "SELECT task_id, keyword, category, max_notes, status, platform, started_at, finished_at FROM tasks ORDER BY started_at DESC"
         ).fetchall())
     for r in rows:
         rt = _running.get(r["task_id"])
         if rt:
             r["status"] = rt["status"]
-    return [{"id": r["task_id"], **{k: r[k] for k in ("keyword", "category", "max_notes", "status", "started_at", "finished_at")}} for r in rows]
+    return [{"id": r["task_id"], **{k: r[k] for k in ("keyword", "category", "max_notes", "status", "platform", "started_at", "finished_at")}} for r in rows]
 
 
 @app.post("/api/tasks/{task_id}/stop")
@@ -456,11 +497,15 @@ async def get_settings():
 
 @app.get("/api/cookie-status")
 async def cookie_status():
-    if COOKIE_FILE.exists():
-        size = COOKIE_FILE.stat().st_size
-        label = f"{size / 1024:.1f} KB" if size > 1024 else f"{size} B"
-        return {"exists": True, "size": label}
-    return {"exists": False}
+    result = {}
+    for key, cfg in PLATFORMS.items():
+        if cfg["cookie"].exists():
+            size = cfg["cookie"].stat().st_size
+            label = f"{size / 1024:.1f} KB" if size > 1024 else f"{size} B"
+            result[key] = {"exists": True, "size": label, "name": cfg["name"], "login_script": cfg["login_script"]}
+        else:
+            result[key] = {"exists": False, "name": cfg["name"], "login_script": cfg["login_script"]}
+    return result
 
 
 @app.put("/api/settings")
@@ -492,11 +537,14 @@ async def create_schedule(body: dict):
         return {"error": "间隔不能小于 0.5 小时"}
     now = _now()
     next_run = (datetime.now() + timedelta(hours=interval_hours)).strftime("%Y-%m-%d %H:%M:%S")
+    platform = body.get("platform", "xhs")
+    if platform not in PLATFORMS:
+        return {"error": f"不支持的平台: {platform}"}
     with get_db() as db:
         db.execute(
-            """INSERT INTO schedules (schedule_id, keyword, category, max_notes, delay, interval_hours, enabled, next_run_at, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)""",
-            (sid, keyword, category, max_notes, delay, interval_hours, next_run, now),
+            """INSERT INTO schedules (schedule_id, keyword, category, max_notes, delay, interval_hours, enabled, platform, next_run_at, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)""",
+            (sid, keyword, category, max_notes, delay, interval_hours, platform, next_run, now),
         )
         db.commit()
     return {"schedule_id": sid}
@@ -574,6 +622,7 @@ async def _scheduler_loop():
                         try:
                             task_id = await _launch_scraper(
                                 s["keyword"], s["category"], s["max_notes"], s["delay"],
+                                s.get("platform", "xhs"),
                             )
                             # Wait for the task to finish
                             while task_id in _running:

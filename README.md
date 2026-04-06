@@ -8,10 +8,18 @@
 
 ## English
 
-Multi-platform AI image generation prompt collector and manager. Automatically scrapes notes from social platforms, extracts structured prompts via LLM, stores everything in a local SQLite database, and provides a dark-themed Web UI for browsing and management.
+Multi-platform AI image generation prompt collector and manager. Automatically scrapes notes from social platforms (Xiaohongshu & X/Twitter), extracts structured prompts via LLM, stores everything in a local SQLite database, and provides a dark-themed Web UI for browsing and management.
+
+### Supported Platforms
+
+| Platform | Scraper | Login Script |
+|----------|---------|--------------|
+| **Xiaohongshu (小红书)** | `download_xhs_prompt.py` | `save_login.py` |
+| **X (Twitter)** | `download_x_prompt.py` | `save_login_x.py` |
 
 ### Features
 
+- **Multi-Platform** — Supports Xiaohongshu and X (Twitter) with platform-specific scrapers sharing a unified data format
 - **Automated Scraping** — Playwright-based browser automation with infinite scroll, carousel image extraction, and cookie-based authentication
 - **LLM Quality Gate** — Each note is processed by an LLM to extract structured prompts (prompt, model, parameters, style tags). Notes without valid prompts are discarded automatically
 - **Model Normalization** — Extracted model names are normalized to a whitelist: `Midjourney`, `FLUX`, `Seedream`, `NanoBanana`, with extensive alias mapping
@@ -30,15 +38,19 @@ uv sync
 uv run playwright install chromium
 ```
 
-#### 2. Save Login State (one-time)
+#### 2. Save Login State (one-time per platform)
 
 ```bash
+# Xiaohongshu
 uv run save_login.py
+
+# X (Twitter)
+uv run save_login_x.py
 ```
 
-A browser window opens — log into Xiaohongshu manually, then press Enter in the terminal. Cookies are saved to `xhs_auth.json` for future use.
+A browser window opens — log in manually, then press Enter in the terminal. Cookies are saved for future use.
 
-> Re-run this script when cookies expire.
+> Re-run the relevant script when cookies expire.
 
 #### 3. Start the Web UI
 
@@ -65,8 +77,13 @@ Navigate to **Settings** in the sidebar and enter your OpenRouter API key. Get o
 ### CLI Usage
 
 ```bash
+# Xiaohongshu
 uv run download_xhs_prompt.py --keyword "architecture prompts" --category "architecture"
 uv run download_xhs_prompt.py --keyword "interior AI" --category "interior" --max-notes 50 --delay 5
+
+# X (Twitter)
+uv run download_x_prompt.py --keyword "midjourney architecture" --category "architecture"
+uv run download_x_prompt.py --keyword "AI art prompt" --category "art" --max-notes 50
 ```
 
 | Argument | Description | Default |
@@ -112,11 +129,13 @@ All variants and aliases (MJ, Flux.1, Banana Pro, Seed Dream, etc.) are auto-nor
 ```
 ├── app.py                    # FastAPI backend + API endpoints
 ├── templates/index.html      # Single-page frontend (Tailwind CSS dark theme)
-├── download_xhs_prompt.py    # Scraper (Playwright + LLM extraction)
-├── save_login.py             # One-time login cookie saver
+├── download_xhs_prompt.py    # Xiaohongshu scraper (Playwright + LLM extraction)
+├── download_x_prompt.py      # X (Twitter) scraper (Playwright + LLM extraction)
+├── save_login.py             # Xiaohongshu login cookie saver
+├── save_login_x.py           # X (Twitter) login cookie saver
 ├── pyproject.toml            # Dependencies
 ├── .env                      # Environment variables (API key)
-├── xhs_auth.json             # Login cookies (auto-generated, gitignored)
+├── *_auth.json               # Login cookies (auto-generated, gitignored)
 └── xhs_notes.db              # SQLite database (auto-generated, gitignored)
 ```
 
@@ -135,10 +154,18 @@ All variants and aliases (MJ, Flux.1, Banana Pro, Seed Dream, etc.) are auto-nor
 
 ## 中文
 
-多平台 AI 图像生成提示词采集与管理工具。自动从社交平台采集笔记，通过 LLM 提取结构化提示词，存入本地 SQLite 数据库，并提供暗黑主题 Web UI 进行浏览和管理。
+多平台 AI 图像生成提示词采集与管理工具。自动从社交平台（小红书 & X/Twitter）采集笔记，通过 LLM 提取结构化提示词，存入本地 SQLite 数据库，并提供暗黑主题 Web UI 进行浏览和管理。
+
+### 支持平台
+
+| 平台 | 采集脚本 | 登录脚本 |
+|------|----------|----------|
+| **小红书** | `download_xhs_prompt.py` | `save_login.py` |
+| **X (Twitter)** | `download_x_prompt.py` | `save_login_x.py` |
 
 ### 功能特性
 
+- **多平台支持** — 支持小红书和 X (Twitter)，各平台独立采集脚本，统一数据格式
 - **自动采集** — 基于 Playwright 的浏览器自动化，支持无限滚动、轮播图提取、Cookie 认证
 - **LLM 质量过滤** — 每条笔记经 LLM 提取结构化提示词（prompt、model、parameters、style_tags），无有效提示词的笔记自动丢弃
 - **模型名归一化** — 提取的模型名自动映射到白名单：`Midjourney`、`FLUX`、`Seedream`、`NanoBanana`，覆盖各种别名写法
@@ -157,15 +184,19 @@ uv sync
 uv run playwright install chromium
 ```
 
-#### 2. 保存登录状态（仅需一次）
+#### 2. 保存登录状态（每个平台仅需一次）
 
 ```bash
+# 小红书
 uv run save_login.py
+
+# X (Twitter)
+uv run save_login_x.py
 ```
 
-运行后会打开浏览器，手动登录小红书，登录成功后回到终端按回车。Cookie 保存在 `xhs_auth.json`，后续采集自动加载。
+运行后会打开浏览器，手动登录对应平台，登录成功后回到终端按回车。Cookie 自动保存，后续采集自动加载。
 
-> Cookie 过期后需重新运行此脚本。
+> Cookie 过期后需重新运行对应登录脚本。
 
 #### 3. 启动 Web UI
 
@@ -192,8 +223,13 @@ uv run app.py
 ### 命令行使用
 
 ```bash
+# 小红书
 uv run download_xhs_prompt.py --keyword "建筑提示词" --category "建筑"
 uv run download_xhs_prompt.py --keyword "室内设计AI" --category "室内" --max-notes 50 --delay 5
+
+# X (Twitter)
+uv run download_x_prompt.py --keyword "midjourney architecture" --category "建筑"
+uv run download_x_prompt.py --keyword "AI art prompt" --category "综合" --max-notes 50
 ```
 
 | 参数 | 说明 | 默认值 |
@@ -239,11 +275,13 @@ uv run download_xhs_prompt.py --keyword "室内设计AI" --category "室内" --m
 ```
 ├── app.py                    # FastAPI 后端 + API 端点
 ├── templates/index.html      # 单页前端（Tailwind CSS 暗黑主题）
-├── download_xhs_prompt.py    # 采集脚本（Playwright + LLM 提取）
-├── save_login.py             # 一次性登录 Cookie 保存
+├── download_xhs_prompt.py    # 小红书采集脚本（Playwright + LLM 提取）
+├── download_x_prompt.py      # X (Twitter) 采集脚本（Playwright + LLM 提取）
+├── save_login.py             # 小红书登录 Cookie 保存
+├── save_login_x.py           # X (Twitter) 登录 Cookie 保存
 ├── pyproject.toml            # 项目依赖
 ├── .env                      # 环境变量（API Key）
-├── xhs_auth.json             # 登录 Cookie（自动生成，已 gitignore）
+├── *_auth.json               # 登录 Cookie（自动生成，已 gitignore）
 └── xhs_notes.db              # SQLite 数据库（自动生成，已 gitignore）
 ```
 
