@@ -30,12 +30,14 @@ PLATFORMS = {
         "scraper": str(Path(__file__).parent / "download_xhs_prompt.py"),
         "cookie": Path(__file__).parent / "xhs_auth.json",
         "login_script": "save_login.py",
+        "login_url": "https://www.xiaohongshu.com",
     },
     "x": {
         "name": "X (Twitter)",
         "scraper": str(Path(__file__).parent / "download_x_prompt.py"),
         "cookie": Path(__file__).parent / "x_auth.json",
         "login_script": "save_login_x.py",
+        "login_url": "https://x.com/login",
     },
 }
 
@@ -45,6 +47,8 @@ _running: dict[str, dict] = {}
 _active_schedules: set[str] = set()
 # Shared HTTP client for image proxy (created at startup)
 _http_client: httpx.AsyncClient | None = None
+# Active login sessions: platform -> { browser, context, status }
+_login_sessions: dict[str, dict] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +526,75 @@ async def cookie_status():
         else:
             result[key] = {"exists": False, "name": cfg["name"], "login_script": cfg["login_script"]}
     return result
+
+
+# ---------------------------------------------------------------------------
+# API: Login (launch browser for manual login)
+# ---------------------------------------------------------------------------
+@app.post("/api/login/{platform}")
+async def start_login(platform: str):
+    """Open a browser for the user to log in manually."""
+    if platform not in PLATFORMS:
+        return {"error": f"不支持的平台: {platform}"}
+    if platform in _login_sessions:
+        return {"error": "该平台已有登录窗口打开中，请先完成或取消"}
+    pcfg = PLATFORMS[platform]
+
+    async def _open_browser():
+        from playwright.async_api import async_playwright
+        pw = await async_playwright().start()
+        browser = await pw.chromium.launch(headless=False)
+        context = await browser.new_context()
+        page = await context.new_page()
+        await page.goto(pcfg["login_url"])
+        _login_sessions[platform] = {
+            "pw": pw, "browser": browser, "context": context,
+            "status": "waiting",  # waiting | saved | error
+        }
+
+    asyncio.create_task(_open_browser())
+    return {"ok": True, "message": f"正在打开 {pcfg['name']} 登录页面..."}
+
+
+@app.post("/api/login/{platform}/save")
+async def save_login(platform: str):
+    """Save cookies from the open browser session."""
+    if platform not in _login_sessions:
+        return {"error": "没有打开的登录窗口"}
+    session = _login_sessions[platform]
+    pcfg = PLATFORMS[platform]
+    try:
+        await session["context"].storage_state(path=str(pcfg["cookie"]))
+        session["status"] = "saved"
+        await session["browser"].close()
+        await session["pw"].stop()
+        del _login_sessions[platform]
+        return {"ok": True, "message": f"{pcfg['name']} Cookie 已保存"}
+    except Exception as e:
+        session["status"] = "error"
+        return {"error": f"保存失败: {e}"}
+
+
+@app.post("/api/login/{platform}/cancel")
+async def cancel_login(platform: str):
+    """Close the login browser without saving."""
+    if platform not in _login_sessions:
+        return {"error": "没有打开的登录窗口"}
+    session = _login_sessions.pop(platform)
+    try:
+        await session["browser"].close()
+        await session["pw"].stop()
+    except Exception:
+        pass
+    return {"ok": True}
+
+
+@app.get("/api/login/{platform}/status")
+async def login_status(platform: str):
+    """Check if a login session is active."""
+    if platform in _login_sessions:
+        return {"active": True, "status": _login_sessions[platform]["status"]}
+    return {"active": False}
 
 
 @app.put("/api/settings")

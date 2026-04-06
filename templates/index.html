@@ -738,19 +738,35 @@ async function loadSettings() {
   } else {
     status.innerHTML = '<span class="bg-red-500/20 text-red-400 badge">未配置</span><span class="text-xs text-gray-500 ml-2">请填写 API Key 后才能使用采集功能</span>';
   }
-  // Cookie status for all platforms
+  // Cookie status for all platforms with login buttons
   const cookie = document.getElementById('cookie-status');
   try {
     const resp = await fetch('/api/cookie-status');
     const cs = await resp.json();
-    cookie.innerHTML = Object.entries(cs).map(([key, p]) => `
-      <div class="flex items-center gap-2 mb-2">
-        <span class="text-sm text-gray-300 w-24">${esc(p.name)}</span>
-        ${p.exists
-          ? `<span class="bg-emerald-500/20 text-emerald-400 badge">已登录</span><span class="text-xs text-gray-500 ml-1">Cookie（${p.size}）</span>`
-          : `<span class="bg-red-500/20 text-red-400 badge">未登录</span><span class="text-xs text-gray-500 ml-1">请运行 <code class="bg-surface px-1.5 py-0.5 rounded text-indigo-400">uv run ${esc(p.login_script)}</code></span>`}
-      </div>
-    `).join('');
+    // Also check active login sessions
+    const loginStates = {};
+    for (const key of Object.keys(cs)) {
+      try {
+        const ls = await (await fetch('/api/login/' + key + '/status')).json();
+        loginStates[key] = ls;
+      } catch(e) { loginStates[key] = { active: false }; }
+    }
+    cookie.innerHTML = Object.entries(cs).map(([key, p]) => {
+      const ls = loginStates[key] || { active: false };
+      const loginBtn = ls.active
+        ? `<button onclick="saveLoginCookie('${key}')" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs hover:bg-emerald-500 transition-colors">✅ 保存 Cookie</button>
+           <button onclick="cancelLogin('${key}')" class="px-3 py-1 bg-red-600/50 text-red-300 rounded-lg text-xs hover:bg-red-600 transition-colors">取消</button>
+           <span class="text-xs text-amber-400 ml-1">浏览器已打开，请完成登录后点击保存</span>`
+        : `<button onclick="startLogin('${key}')" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-500 transition-colors">${p.exists ? '🔄 重新登录' : '🔑 登录'}</button>`;
+      return `
+        <div class="flex items-center gap-2 mb-3 flex-wrap">
+          <span class="text-sm text-gray-300 w-28">${esc(p.name)}</span>
+          ${p.exists
+            ? `<span class="bg-emerald-500/20 text-emerald-400 badge">已登录</span><span class="text-xs text-gray-500">Cookie（${p.size}）</span>`
+            : `<span class="bg-red-500/20 text-red-400 badge">未登录</span>`}
+          ${loginBtn}
+        </div>`;
+    }).join('');
   } catch(e) { cookie.textContent = '无法获取状态'; }
 }
 
@@ -776,6 +792,30 @@ async function saveApiKey() {
 function toggleKeyVisibility() {
   const input = document.getElementById('apikey-input');
   input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+// ---------------------------------------------------------------------------
+// Login
+// ---------------------------------------------------------------------------
+async function startLogin(platform) {
+  const res = await (await fetch('/api/login/' + platform, { method: 'POST' })).json();
+  if (res.error) { alert(res.error); return; }
+  // Refresh settings to show "save" button
+  setTimeout(() => loadSettings(), 1500);
+}
+
+async function saveLoginCookie(platform) {
+  const res = await (await fetch('/api/login/' + platform + '/save', { method: 'POST' })).json();
+  if (res.error) { alert(res.error); return; }
+  alert(res.message || '保存成功');
+  loadSettings();
+  // Refresh platform dropdowns
+  _platforms = null;
+}
+
+async function cancelLogin(platform) {
+  await fetch('/api/login/' + platform + '/cancel', { method: 'POST' });
+  loadSettings();
 }
 
 // ---------------------------------------------------------------------------
