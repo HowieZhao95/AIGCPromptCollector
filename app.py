@@ -325,7 +325,7 @@ async def _launch_scraper(keyword: str, category: str, max_notes: int, delay: fl
 
     async def run():
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, scraper_path,
+            sys.executable, "-u", scraper_path,
             "--keyword", keyword, "--category", category,
             "--max-notes", str(max_notes), "--delay", str(delay), "--headless",
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT,
