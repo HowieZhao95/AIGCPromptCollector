@@ -1,0 +1,15 @@
+[project]
+name = "projectcodemac2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "browser-use>=0.12.6",
+    "fastapi>=0.135.3",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "langchain-openai>=1.1.9",
+    "playwright>=1.58.0",
+    "uvicorn>=0.43.0",
+]

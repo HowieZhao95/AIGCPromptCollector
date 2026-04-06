@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# XHS data
+images/
+*.db
+xhs_auth.json
+
+# Secrets
+.env
+
+# IDE / Tools
+.claude/
+.vscode/
+.idea/

@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIGC Prompt Collector</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{colors:{surface:'#0f1117',card:'#1a1d27',border:'#2a2d3a',muted:'#6b7280',accent:'#6366f1'}}}}</script>
+  <style>
+    .log-terminal { font-family: 'Menlo', 'Monaco', monospace; font-size: 13px; }
+    .log-terminal::-webkit-scrollbar { width: 6px; }
+    .log-terminal::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+    .lightbox { backdrop-filter: blur(8px); }
+    .fade-in { animation: fadeIn 0.2s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+    body::-webkit-scrollbar { width: 8px; }
+    body::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 4px; }
+    body::-webkit-scrollbar-track { background: #0f1117; }
+  </style>
+</head>
+<body class="bg-surface text-gray-200 min-h-screen">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <nav class="w-56 bg-card border-r border-border flex flex-col fixed h-full">
+      <div class="p-5 border-b border-border">
+        <h1 class="text-lg font-bold text-indigo-400">AIGC Prompt Collector</h1>
+        <p class="text-xs text-muted mt-1">多平台提示词采集</p>
+      </div>
+      <div class="flex-1 p-3 space-y-1">
+        <a href="#dashboard" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="dashboard">
+          <span>📊</span> Dashboard
+        </a>
+        <a href="#tasks" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="tasks">
+          <span>🚀</span> 采集任务
+        </a>
+        <a href="#notes" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="notes">
+          <span>📝</span> 提示词浏览
+        </a>
+        <a href="#schedules" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="schedules">
+          <span>⏰</span> 定时任务
+        </a>
+      </div>
+      <div class="p-3 border-t border-border">
+        <a href="#settings" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" data-page="settings">
+          <span>⚙️</span> 设置
+        </a>
+      </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="ml-56 flex-1 p-6">
+
+      <!-- Dashboard -->
+      <section id="page-dashboard" class="page hidden">
+        <h2 class="text-xl font-semibold mb-6 text-gray-100">Dashboard</h2>
+        <div id="stats-cards" class="grid grid-cols-4 gap-4 mb-8"></div>
+        <div class="grid grid-cols-2 gap-6 mb-8">
+          <div class="bg-card rounded-xl border border-border p-5">
+            <h3 class="text-sm font-medium text-muted mb-4">分类分布</h3>
+            <div id="chart-categories"></div>
+          </div>
+          <div class="bg-card rounded-xl border border-border p-5">
+            <h3 class="text-sm font-medium text-muted mb-4">模型分布</h3>
+            <div id="chart-models"></div>
+          </div>
+        </div>
+        <div class="bg-card rounded-xl border border-border p-5">
+          <h3 class="text-sm font-medium text-muted mb-4">最近采集</h3>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-muted border-b border-border">
+              <th class="pb-2">标题</th><th class="pb-2">分类</th><th class="pb-2">模型</th>
+              <th class="pb-2">图片</th><th class="pb-2">时间</th>
+            </tr></thead>
+            <tbody id="recent-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Tasks -->
+      <section id="page-tasks" class="page hidden">
+        <h2 class="text-xl font-semibold mb-6 text-gray-100">采集任务</h2>
+        <div class="grid grid-cols-2 gap-6 mb-6">
+          <div class="bg-card rounded-xl border border-border p-6">
+            <h3 class="text-sm font-medium text-muted mb-4">新建任务</h3>
+            <form id="task-form" class="space-y-4">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">搜索关键词</label>
+                <input name="keyword" type="text" placeholder="如：建筑提示词" required
+                  class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">分类标签</label>
+                <input name="category" type="text" placeholder="如：建筑" required
+                  class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm text-gray-400 mb-1">最大笔记数</label>
+                  <input name="max_notes" type="number" value="20" min="1" max="100"
+                    class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-400 mb-1">延迟 (秒)</label>
+                  <input name="delay" type="number" value="3" min="1" max="10"
+                    class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+              </div>
+              <button type="submit" id="task-btn"
+                class="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                🚀 开始采集
+              </button>
+            </form>
+          </div>
+          <div class="bg-card rounded-xl border border-border p-6 flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-medium text-muted">实时日志</h3>
+              <button id="stop-btn" onclick="stopCurrentTask()" class="hidden px-3 py-1 bg-red-600/80 text-white rounded-lg text-xs hover:bg-red-500 transition-colors">
+                ⏹ 停止
+              </button>
+            </div>
+            <div id="log-terminal" class="log-terminal flex-1 min-h-[400px] bg-black/40 text-emerald-400 rounded-lg p-4 overflow-y-auto whitespace-pre-wrap border border-border">
+              等待任务启动...
+            </div>
+          </div>
+        </div>
+        <!-- Task History -->
+        <div class="bg-card rounded-xl border border-border p-5">
+          <h3 class="text-sm font-medium text-muted mb-4">任务历史</h3>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-muted border-b border-border">
+              <th class="pb-2">ID</th><th class="pb-2">关键词</th><th class="pb-2">分类</th>
+              <th class="pb-2">数量</th><th class="pb-2">状态</th><th class="pb-2">开始时间</th>
+              <th class="pb-2">操作</th>
+            </tr></thead>
+            <tbody id="task-history"></tbody>
+          </table>
+          <p id="task-history-empty" class="text-muted text-sm text-center py-4 hidden">暂无任务记录</p>
+        </div>
+      </section>
+
+      <!-- Notes Browser -->
+      <section id="page-notes" class="page hidden">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xl font-semibold text-gray-100">提示词浏览</h2>
+          <div class="flex gap-3">
+            <select id="filter-category" class="px-3 py-2 bg-card border border-border rounded-lg text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">全部分类</option>
+            </select>
+            <select id="filter-model" class="px-3 py-2 bg-card border border-border rounded-lg text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="">全部模型</option>
+            </select>
+            <input id="filter-search" type="text" placeholder="搜索标题/描述..."
+              class="px-3 py-2 bg-card border border-border rounded-lg text-sm text-gray-300 w-48 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+        <div id="notes-grid" class="grid grid-cols-3 gap-5"></div>
+        <div id="notes-pagination" class="flex items-center justify-center gap-4 mt-6"></div>
+      </section>
+
+      <!-- Schedules -->
+      <section id="page-schedules" class="page hidden">
+        <h2 class="text-xl font-semibold mb-6 text-gray-100">定时任务</h2>
+        <div class="grid grid-cols-3 gap-6 mb-6">
+          <!-- Create Schedule Form -->
+          <div class="bg-card rounded-xl border border-border p-6 col-span-1">
+            <h3 class="text-sm font-medium text-muted mb-4">新建定时任务</h3>
+            <form id="schedule-form" class="space-y-3">
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">搜索关键词</label>
+                <input name="keyword" type="text" placeholder="如：建筑提示词" required
+                  class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              </div>
+              <div>
+                <label class="block text-sm text-gray-400 mb-1">分类标签</label>
+                <input name="category" type="text" placeholder="如：建筑" required
+                  class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm text-gray-400 mb-1">最大笔记数</label>
+                  <input name="max_notes" type="number" value="20" min="1" max="100"
+                    class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-400 mb-1">间隔 (小时)</label>
+                  <input name="interval_hours" type="number" value="24" min="0.5" max="168" step="0.5"
+                    class="w-full px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                </div>
+              </div>
+              <button type="submit"
+                class="w-full py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 transition-colors">
+                ⏰ 创建定时任务
+              </button>
+            </form>
+          </div>
+          <!-- Schedule Info -->
+          <div class="bg-card rounded-xl border border-border p-6 col-span-2">
+            <h3 class="text-sm font-medium text-muted mb-3">说明</h3>
+            <ul class="text-sm text-gray-400 space-y-2">
+              <li>• 定时任务按设定间隔自动运行采集，<strong class="text-gray-300">已采集过的笔记会自动跳过</strong>（去重）</li>
+              <li>• 服务启动后调度器自动运行，每 30 秒检查一次是否有到期任务</li>
+              <li>• 每次执行会生成一条采集任务记录，可在「采集任务」页查看日志</li>
+              <li>• 最小间隔 0.5 小时，建议不要设太短以免触发反爬</li>
+              <li>• 可随时启用/禁用或删除定时任务</li>
+            </ul>
+          </div>
+        </div>
+        <!-- Schedule List -->
+        <div class="bg-card rounded-xl border border-border p-5">
+          <h3 class="text-sm font-medium text-muted mb-4">定时任务列表</h3>
+          <table class="w-full text-sm">
+            <thead><tr class="text-left text-muted border-b border-border">
+              <th class="pb-2">关键词</th><th class="pb-2">分类</th><th class="pb-2">数量</th>
+              <th class="pb-2">间隔</th><th class="pb-2">状态</th>
+              <th class="pb-2">上次执行</th><th class="pb-2">下次执行</th><th class="pb-2">操作</th>
+            </tr></thead>
+            <tbody id="schedule-list"></tbody>
+          </table>
+          <p id="schedule-empty" class="text-muted text-sm text-center py-4 hidden">暂无定时任务</p>
+        </div>
+      </section>
+
+      <!-- Note Detail -->
+      <section id="page-detail" class="page hidden">
+        <div class="flex items-center justify-between mb-4">
+          <button onclick="history.back()" class="text-sm text-indigo-400 hover:text-indigo-300 inline-flex items-center gap-1">
+            ← 返回列表
+          </button>
+          <button id="delete-note-btn" class="px-3 py-1.5 bg-red-600/20 text-red-400 rounded-lg text-xs hover:bg-red-600/40 transition-colors">
+            🗑 删除笔记
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-6">
+          <div>
+            <div id="detail-images" class="grid grid-cols-3 gap-2"></div>
+          </div>
+          <div class="space-y-5">
+            <div class="bg-card rounded-xl border border-border p-5">
+              <h2 id="detail-title" class="text-lg font-semibold mb-2 text-gray-100"></h2>
+              <div id="detail-meta" class="flex gap-2 flex-wrap mb-4"></div>
+              <div id="detail-prompt" class="space-y-3"></div>
+            </div>
+            <div class="bg-card rounded-xl border border-border p-5">
+              <h3 class="text-sm font-medium text-muted mb-2">原始描述</h3>
+              <p id="detail-desc" class="text-sm text-gray-400 whitespace-pre-wrap"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="page-settings" class="page hidden">
+        <h2 class="text-xl font-semibold mb-6 text-gray-100">设置</h2>
+        <div class="max-w-xl space-y-6">
+          <div class="bg-card rounded-xl border border-border p-6">
+            <h3 class="text-sm font-medium text-muted mb-4">OpenRouter API Key</h3>
+            <p class="text-xs text-gray-500 mb-4">用于调用 LLM 提取结构化提示词。获取地址：<a href="https://openrouter.ai/keys" target="_blank" class="text-indigo-400 hover:text-indigo-300">openrouter.ai/keys</a></p>
+            <div id="apikey-status" class="mb-4"></div>
+            <div class="flex gap-3">
+              <input id="apikey-input" type="password" placeholder="sk-or-v1-..."
+                class="flex-1 px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-200 font-mono placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+              <button onclick="toggleKeyVisibility()" id="apikey-toggle"
+                class="px-3 py-2 bg-surface border border-border rounded-lg text-sm text-gray-400 hover:text-gray-200 transition-colors">
+                👁
+              </button>
+              <button onclick="saveApiKey()"
+                class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-500 transition-colors">
+                保存
+              </button>
+            </div>
+            <p id="apikey-msg" class="text-xs mt-2 hidden"></p>
+          </div>
+          <div class="bg-card rounded-xl border border-border p-6">
+            <h3 class="text-sm font-medium text-muted mb-4">登录状态</h3>
+            <div id="cookie-status" class="text-sm text-gray-400"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="lightbox fixed inset-0 bg-black/90 z-50 hidden items-center justify-center cursor-pointer" onclick="this.classList.add('hidden');this.classList.remove('flex')">
+    <img id="lightbox-img" class="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl">
+  </div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Router
+// ---------------------------------------------------------------------------
+function route() {
+  const hash = location.hash || '#dashboard';
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-link').forEach(a => {
+    a.classList.remove('bg-indigo-500/15', 'text-indigo-400');
+    a.classList.add('text-gray-400', 'hover:bg-white/5');
+  });
+
+  if (hash.startsWith('#note/')) {
+    show('page-detail');
+    loadDetail(hash.split('/')[1]);
+  } else {
+    const page = hash.slice(1) || 'dashboard';
+    show('page-' + page);
+    const link = document.querySelector(`[data-page="${page}"]`);
+    if (link) {
+      link.classList.add('bg-indigo-500/15', 'text-indigo-400');
+      link.classList.remove('text-gray-400', 'hover:bg-white/5');
+    }
+    if (page === 'dashboard') loadDashboard();
+    if (page === 'notes') { notesPage = 1; loadFilters(); loadNotes(); }
+    if (page === 'tasks') initTaskPage();
+    if (page === 'schedules') initSchedulePage();
+    if (page === 'settings') loadSettings();
+  }
+}
+
+function show(id) {
+  const el = document.getElementById(id);
+  if (el) { el.classList.remove('hidden'); el.classList.add('fade-in'); }
+}
+
+async function api(path) { return (await fetch('/api' + path)).json(); }
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+async function loadDashboard() {
+  const d = await api('/stats');
+  const cards = [
+    { label: '总笔记', value: d.total, color: 'indigo' },
+    { label: '分类数', value: d.categories.length, color: 'emerald' },
+    { label: '模型数', value: d.models.length, color: 'amber' },
+    { label: '总图片', value: d.total_images, color: 'rose' },
+  ];
+  document.getElementById('stats-cards').innerHTML = cards.map(c => `
+    <div class="bg-card rounded-xl border border-border p-5">
+      <p class="text-2xl font-bold text-${c.color}-400">${c.value}</p>
+      <p class="text-sm text-muted mt-1">${c.label}</p>
+    </div>
+  `).join('');
+
+  renderBar('chart-categories', d.categories, 'indigo');
+  renderBar('chart-models', d.models, 'emerald');
+
+  document.getElementById('recent-table').innerHTML = d.recent.map(n => `
+    <tr class="border-b border-border hover:bg-white/5 cursor-pointer" onclick="location.hash='#note/${n.note_id}'">
+      <td class="py-2.5 text-gray-300">${esc(n.title || '无标题').slice(0, 30)}</td>
+      <td><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(n.category)}</span></td>
+      <td><span class="bg-emerald-500/20 text-emerald-400 badge">${esc(n.model || '-')}</span></td>
+      <td class="text-gray-400">${n.image_count}</td>
+      <td class="text-muted">${(n.created_at || '').slice(0, 10)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderBar(id, items, color) {
+  const max = Math.max(...items.map(i => i.count), 1);
+  document.getElementById(id).innerHTML = items.slice(0, 8).map(i => `
+    <div class="flex items-center gap-3 mb-2">
+      <span class="text-sm w-24 truncate text-right text-gray-400">${esc(i.category || i.model || '-')}</span>
+      <div class="flex-1 bg-white/5 rounded-full h-5 overflow-hidden">
+        <div class="bg-${color}-500/60 h-full rounded-full transition-all" style="width:${(i.count/max*100).toFixed(0)}%"></div>
+      </div>
+      <span class="text-sm text-muted w-8">${i.count}</span>
+    </div>
+  `).join('') || '<p class="text-sm text-muted">暂无数据</p>';
+}
+
+// ---------------------------------------------------------------------------
+// Tasks
+// ---------------------------------------------------------------------------
+let taskEventSource = null;
+let currentTaskId = null;
+
+function initTaskPage() {
+  loadTaskHistory();
+  const form = document.getElementById('task-form');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const body = Object.fromEntries(fd);
+    body.max_notes = parseInt(body.max_notes);
+    body.delay = parseInt(body.delay);
+
+    const btn = document.getElementById('task-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 采集中...';
+    document.getElementById('stop-btn').classList.remove('hidden');
+    const terminal = document.getElementById('log-terminal');
+    terminal.textContent = '';
+
+    const res = await (await fetch('/api/tasks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })).json();
+
+    if (res.error) {
+      terminal.textContent = '❌ ' + res.error;
+      btn.disabled = false;
+      btn.textContent = '🚀 开始采集';
+      document.getElementById('stop-btn').classList.add('hidden');
+      return;
+    }
+
+    currentTaskId = res.task_id;
+    loadTaskHistory();
+
+    if (taskEventSource) taskEventSource.close();
+    taskEventSource = new EventSource('/api/tasks/' + res.task_id + '/logs');
+    taskEventSource.onmessage = (e) => {
+      terminal.textContent += e.data + '\n';
+      terminal.scrollTop = terminal.scrollHeight;
+    };
+    taskEventSource.addEventListener('done', (e) => {
+      terminal.textContent += '\n✅ 任务结束: ' + e.data + '\n';
+      taskEventSource.close();
+      btn.disabled = false;
+      btn.textContent = '🚀 开始采集';
+      document.getElementById('stop-btn').classList.add('hidden');
+      currentTaskId = null;
+      loadTaskHistory();
+    });
+    taskEventSource.onerror = () => {
+      taskEventSource.close();
+      btn.disabled = false;
+      btn.textContent = '🚀 开始采集';
+      document.getElementById('stop-btn').classList.add('hidden');
+      currentTaskId = null;
+    };
+  };
+}
+
+async function stopCurrentTask() {
+  if (!currentTaskId) return;
+  await fetch('/api/tasks/' + currentTaskId + '/stop', { method: 'POST' });
+  document.getElementById('log-terminal').textContent += '\n⏹ 任务已停止\n';
+  document.getElementById('task-btn').disabled = false;
+  document.getElementById('task-btn').textContent = '🚀 开始采集';
+  document.getElementById('stop-btn').classList.add('hidden');
+  if (taskEventSource) taskEventSource.close();
+  currentTaskId = null;
+  loadTaskHistory();
+}
+
+async function deleteTask(taskId) {
+  await fetch('/api/tasks/' + taskId, { method: 'DELETE' });
+  loadTaskHistory();
+}
+
+async function viewTaskLog(taskId) {
+  const terminal = document.getElementById('log-terminal');
+  // Reload logs from SSE history — fetch all logs
+  const res = await fetch('/api/tasks/' + taskId + '/logs');
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  terminal.textContent = '';
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        terminal.textContent += line.slice(6) + '\n';
+      }
+    }
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+}
+
+async function loadTaskHistory() {
+  const tasks = await api('/tasks');
+  const tbody = document.getElementById('task-history');
+  const empty = document.getElementById('task-history-empty');
+  if (!tasks.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  const statusMap = {
+    running: '<span class="bg-blue-500/20 text-blue-400 badge">运行中</span>',
+    done: '<span class="bg-emerald-500/20 text-emerald-400 badge">完成</span>',
+    failed: '<span class="bg-red-500/20 text-red-400 badge">失败</span>',
+    stopped: '<span class="bg-amber-500/20 text-amber-400 badge">已停止</span>',
+  };
+  tbody.innerHTML = tasks.map(t => `
+    <tr class="border-b border-border hover:bg-white/5">
+      <td class="py-2 text-gray-500 font-mono text-xs">${esc(t.id)}</td>
+      <td class="py-2 text-gray-300">${esc(t.keyword)}</td>
+      <td class="py-2"><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(t.category)}</span></td>
+      <td class="py-2 text-gray-400">${t.max_notes || '-'}</td>
+      <td class="py-2">${statusMap[t.status] || t.status}</td>
+      <td class="py-2 text-muted text-xs">${esc(t.started_at || '')}</td>
+      <td class="py-2">
+        <div class="flex gap-2">
+          <button onclick="viewTaskLog('${t.id}')" class="text-xs text-indigo-400 hover:text-indigo-300">日志</button>
+          ${t.status === 'running'
+            ? `<button onclick="fetch('/api/tasks/${t.id}/stop',{method:'POST'}).then(()=>loadTaskHistory())" class="text-xs text-amber-400 hover:text-amber-300">停止</button>`
+            : `<button onclick="deleteTask('${t.id}')" class="text-xs text-red-400 hover:text-red-300">删除</button>`}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Schedules
+// ---------------------------------------------------------------------------
+function initSchedulePage() {
+  loadSchedules();
+  const form = document.getElementById('schedule-form');
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const body = Object.fromEntries(fd);
+    body.max_notes = parseInt(body.max_notes);
+    body.interval_hours = parseFloat(body.interval_hours);
+    body.delay = 3;
+    const res = await (await fetch('/api/schedules', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })).json();
+    if (res.error) { alert(res.error); return; }
+    form.reset();
+    form.querySelector('[name=max_notes]').value = '20';
+    form.querySelector('[name=interval_hours]').value = '24';
+    loadSchedules();
+  };
+}
+
+async function loadSchedules() {
+  const schedules = await api('/schedules');
+  const tbody = document.getElementById('schedule-list');
+  const empty = document.getElementById('schedule-empty');
+  if (!schedules.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  tbody.innerHTML = schedules.map(s => `
+    <tr class="border-b border-border hover:bg-white/5">
+      <td class="py-2.5 text-gray-300">${esc(s.keyword)}</td>
+      <td class="py-2.5"><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(s.category)}</span></td>
+      <td class="py-2.5 text-gray-400">${s.max_notes}</td>
+      <td class="py-2.5 text-gray-400">${s.interval_hours}h</td>
+      <td class="py-2.5">
+        ${s.enabled
+          ? '<span class="bg-emerald-500/20 text-emerald-400 badge">启用</span>'
+          : '<span class="bg-gray-500/20 text-gray-400 badge">禁用</span>'}
+      </td>
+      <td class="py-2.5 text-muted text-xs">${esc(s.last_run_at || '从未执行')}</td>
+      <td class="py-2.5 text-muted text-xs">${s.enabled ? esc(s.next_run_at || '-') : '-'}</td>
+      <td class="py-2.5">
+        <div class="flex gap-2">
+          <button onclick="toggleSchedule('${s.schedule_id}', ${s.enabled ? 0 : 1})"
+            class="text-xs ${s.enabled ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'}">
+            ${s.enabled ? '禁用' : '启用'}
+          </button>
+          <button onclick="runScheduleNow('${s.schedule_id}')" class="text-xs text-blue-400 hover:text-blue-300">立即执行</button>
+          <button onclick="deleteSchedule('${s.schedule_id}')" class="text-xs text-red-400 hover:text-red-300">删除</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function toggleSchedule(id, enabled) {
+  await fetch('/api/schedules/' + id, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  });
+  loadSchedules();
+}
+
+async function runScheduleNow(id) {
+  // Set next_run_at to now so the scheduler picks it up immediately
+  await fetch('/api/schedules/' + id, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: 1, next_run_at_now: true }),
+  });
+  loadSchedules();
+}
+
+async function deleteSchedule(id) {
+  if (!confirm('确定删除此定时任务？')) return;
+  await fetch('/api/schedules/' + id, { method: 'DELETE' });
+  loadSchedules();
+}
+
+// ---------------------------------------------------------------------------
+// Notes Browser
+// ---------------------------------------------------------------------------
+let notesPage = 1;
+
+async function loadNotes() {
+  const cat = document.getElementById('filter-category').value;
+  const model = document.getElementById('filter-model').value;
+  const search = document.getElementById('filter-search').value;
+
+  let url = `/notes?page=${notesPage}&per_page=24`;
+  if (cat) url += `&category=${encodeURIComponent(cat)}`;
+  if (model) url += `&model=${encodeURIComponent(model)}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+
+  const d = await api(url);
+  const grid = document.getElementById('notes-grid');
+
+  grid.innerHTML = d.notes.map(n => `
+    <a href="#note/${n.note_id}" class="bg-card rounded-xl border border-border overflow-hidden hover:border-indigo-500/50 transition-colors block">
+      ${n.thumbnail
+        ? `<img src="/api/image-proxy?url=${encodeURIComponent(n.thumbnail)}" class="w-full h-48 object-cover" loading="lazy" onerror="this.style.display='none'">`
+        : `<div class="w-full h-48 bg-white/5 flex items-center justify-center text-gray-600 text-3xl">🖼</div>`}
+      <div class="p-4">
+        <h3 class="text-sm font-medium mb-2 line-clamp-2 text-gray-200">${esc(n.title || '无标题')}</h3>
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="bg-indigo-500/20 text-indigo-400 badge">${esc(n.category)}</span>
+          ${n.model ? `<span class="bg-emerald-500/20 text-emerald-400 badge">${esc(n.model)}</span>` : ''}
+          <span class="text-xs text-muted ml-auto">🖼 ${n.image_count}</span>
+        </div>
+        <p class="text-xs text-muted mt-2">${esc(n.author_name || '')} · ${(n.created_at || '').slice(0, 10)}</p>
+      </div>
+    </a>
+  `).join('') || '<p class="text-muted col-span-3 text-center py-12">暂无数据</p>';
+
+  const totalPages = Math.ceil(d.total / d.per_page) || 1;
+  document.getElementById('notes-pagination').innerHTML = `
+    <button onclick="notesPage=Math.max(1,notesPage-1);loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage <= 1 ? 'opacity-30 pointer-events-none' : 'hover:bg-white/5'}" ${notesPage <= 1 ? 'disabled' : ''}>上一页</button>
+    <span class="text-sm text-muted">${notesPage} / ${totalPages}（共 ${d.total} 条）</span>
+    <button onclick="notesPage++;loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage >= totalPages ? 'opacity-30 pointer-events-none' : 'hover:bg-white/5'}" ${notesPage >= totalPages ? 'disabled' : ''}>下一页</button>
+  `;
+}
+
+async function loadFilters() {
+  const cats = await api('/categories');
+  const models = await api('/models');
+  const catSel = document.getElementById('filter-category');
+  const modSel = document.getElementById('filter-model');
+  catSel.innerHTML = '<option value="">全部分类</option>';
+  modSel.innerHTML = '<option value="">全部模型</option>';
+  cats.forEach(c => catSel.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`);
+  models.forEach(m => modSel.innerHTML += `<option value="${esc(m)}">${esc(m)}</option>`);
+}
+
+let filterTimer;
+document.getElementById('filter-category').onchange = () => { notesPage = 1; loadNotes(); };
+document.getElementById('filter-model').onchange = () => { notesPage = 1; loadNotes(); };
+document.getElementById('filter-search').oninput = () => {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(() => { notesPage = 1; loadNotes(); }, 300);
+};
+
+// ---------------------------------------------------------------------------
+// Note Detail
+// ---------------------------------------------------------------------------
+async function loadDetail(noteId) {
+  const n = await api('/notes/' + noteId);
+  if (n.error) return;
+
+  document.getElementById('detail-title').textContent = n.title || '无标题';
+
+  document.getElementById('delete-note-btn').onclick = async () => {
+    if (!confirm('确定删除这条笔记？')) return;
+    await fetch('/api/notes/' + noteId, { method: 'DELETE' });
+    location.hash = '#notes';
+  };
+
+  document.getElementById('detail-meta').innerHTML = `
+    <span class="bg-indigo-500/20 text-indigo-400 badge">${esc(n.category)}</span>
+    ${n.prompt?.model ? `<span class="bg-emerald-500/20 text-emerald-400 badge">${esc(n.prompt.model)}</span>` : ''}
+    <span class="text-xs text-muted">👤 ${esc(n.author_name || '未知')}</span>
+    <span class="text-xs text-muted">📅 ${esc(n.publish_time || n.created_at?.slice(0, 10) || '')}</span>
+    <a href="${esc(n.url)}" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 ml-auto">查看原文 ↗</a>
+  `;
+
+  document.getElementById('detail-images').innerHTML = (n.images || []).map(img => `
+    <img src="/api/image-proxy?url=${encodeURIComponent(img.url)}"
+         class="w-full aspect-square object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity border border-border"
+         loading="lazy" onclick="openLightbox(this.src)"
+         onerror="this.style.display='none'">
+  `).join('') || '<p class="text-muted col-span-3">无图片</p>';
+
+  const p = n.prompt || {};
+  document.getElementById('detail-prompt').innerHTML = `
+    ${p.prompt_en ? `<div><label class="text-xs text-muted">English Prompt</label><p class="text-sm bg-white/5 p-3 rounded-lg mt-1 font-mono text-gray-300 border border-border">${esc(p.prompt_en)}</p></div>` : ''}
+    ${p.prompt_cn ? `<div><label class="text-xs text-muted">中文提示词</label><p class="text-sm bg-white/5 p-3 rounded-lg mt-1 text-gray-300 border border-border">${esc(p.prompt_cn)}</p></div>` : ''}
+    ${p.parameters ? `<div><label class="text-xs text-muted">参数</label><p class="text-sm font-mono text-gray-400 mt-1">${esc(p.parameters)}</p></div>` : ''}
+    ${p.style_tags?.length ? `<div><label class="text-xs text-muted">风格标签</label><div class="flex gap-1.5 flex-wrap mt-1">${p.style_tags.map(t => `<span class="bg-amber-500/20 text-amber-400 badge">${esc(t)}</span>`).join('')}</div></div>` : ''}
+  `;
+
+  document.getElementById('detail-desc').textContent = n.description || '无描述';
+}
+
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.remove('hidden');
+  document.getElementById('lightbox').classList.add('flex');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('lightbox').classList.add('hidden');
+    document.getElementById('lightbox').classList.remove('flex');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+async function loadSettings() {
+  const d = await api('/settings');
+  const status = document.getElementById('apikey-status');
+  if (d.api_key_set) {
+    status.innerHTML = `<span class="inline-flex items-center gap-2 text-sm"><span class="bg-emerald-500/20 text-emerald-400 badge">已配置</span><span class="text-gray-500 font-mono text-xs">${esc(d.api_key_masked)}</span></span>`;
+  } else {
+    status.innerHTML = '<span class="bg-red-500/20 text-red-400 badge">未配置</span><span class="text-xs text-gray-500 ml-2">请填写 API Key 后才能使用采集功能</span>';
+  }
+  // Cookie status
+  const cookie = document.getElementById('cookie-status');
+  try {
+    const resp = await fetch('/api/cookie-status');
+    const cs = await resp.json();
+    cookie.innerHTML = cs.exists
+      ? `<span class="bg-emerald-500/20 text-emerald-400 badge">已登录</span><span class="text-xs text-gray-500 ml-2">Cookie 文件存在（${cs.size}）</span>`
+      : '<span class="bg-red-500/20 text-red-400 badge">未登录</span><span class="text-xs text-gray-500 ml-2">请在终端运行 <code class="bg-surface px-1.5 py-0.5 rounded text-indigo-400">uv run save_login.py</code></span>';
+  } catch(e) { cookie.textContent = '无法获取状态'; }
+}
+
+async function saveApiKey() {
+  const input = document.getElementById('apikey-input');
+  const msg = document.getElementById('apikey-msg');
+  const key = input.value.trim();
+  if (!key) { msg.textContent = '请输入 API Key'; msg.className = 'text-xs mt-2 text-red-400'; msg.classList.remove('hidden'); return; }
+  const res = await (await fetch('/api/settings', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: key }),
+  })).json();
+  if (res.ok) {
+    msg.textContent = '保存成功'; msg.className = 'text-xs mt-2 text-emerald-400'; msg.classList.remove('hidden');
+    input.value = '';
+    loadSettings();
+    setTimeout(() => msg.classList.add('hidden'), 3000);
+  } else {
+    msg.textContent = res.error || '保存失败'; msg.className = 'text-xs mt-2 text-red-400'; msg.classList.remove('hidden');
+  }
+}
+
+function toggleKeyVisibility() {
+  const input = document.getElementById('apikey-input');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+// ---------------------------------------------------------------------------
+// Utils
+// ---------------------------------------------------------------------------
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>
