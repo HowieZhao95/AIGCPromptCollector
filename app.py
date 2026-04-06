@@ -109,6 +109,21 @@ CREATE TABLE IF NOT EXISTS schedules (
 
 _db_initialized = False
 
+# Migrations: add columns that may not exist in older databases
+_MIGRATIONS = [
+    ("tasks", "platform", "ALTER TABLE tasks ADD COLUMN platform TEXT DEFAULT 'xhs'"),
+    ("schedules", "platform", "ALTER TABLE schedules ADD COLUMN platform TEXT DEFAULT 'xhs'"),
+]
+
+
+def _run_migrations(conn: sqlite3.Connection):
+    """Add missing columns to existing tables (safe to run repeatedly)."""
+    for table, column, sql in _MIGRATIONS:
+        cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        if column not in cols:
+            conn.execute(sql)
+    conn.commit()
+
 
 @contextmanager
 def get_db():
@@ -119,6 +134,7 @@ def get_db():
     if not _db_initialized:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(_DB_SCHEMA)
+        _run_migrations(conn)
         _db_initialized = True
     try:
         yield conn
