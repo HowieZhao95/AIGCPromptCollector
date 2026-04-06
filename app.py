@@ -176,6 +176,8 @@ async def stats():
         models = dict_rows(db.execute(
             """SELECT json_extract(structured_prompt, '$.model') as model, COUNT(*) as count
                FROM notes WHERE structured_prompt IS NOT NULL
+                 AND json_extract(structured_prompt, '$.model') IS NOT NULL
+                 AND json_extract(structured_prompt, '$.model') != ''
                GROUP BY model ORDER BY count DESC"""
         ).fetchall())
         recent = dict_rows(db.execute(
@@ -201,7 +203,10 @@ async def list_models():
     with get_db() as db:
         rows = db.execute(
             """SELECT DISTINCT json_extract(structured_prompt, '$.model') as model
-               FROM notes WHERE structured_prompt IS NOT NULL ORDER BY model"""
+               FROM notes WHERE structured_prompt IS NOT NULL
+                 AND json_extract(structured_prompt, '$.model') IS NOT NULL
+                 AND json_extract(structured_prompt, '$.model') != ''
+               ORDER BY model"""
         ).fetchall()
     return [r["model"] for r in rows if r["model"]]
 
