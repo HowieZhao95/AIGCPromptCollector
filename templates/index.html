@@ -5,26 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AIGC Prompt Collector</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config={theme:{extend:{colors:{surface:'#0f1117',card:'#1a1d27',border:'#2a2d3a',muted:'#6b7280',accent:'#6366f1'}}}}</script>
+  <script>tailwind.config={theme:{extend:{colors:{surface:'#08090d',card:'#0e1018',card2:'#131620',border:'#1a1e2e',muted:'#525a6b',accent:'#818cf8'}}}}</script>
   <style>
     .log-terminal { font-family: 'Menlo', 'Monaco', monospace; font-size: 13px; }
     .log-terminal::-webkit-scrollbar { width: 6px; }
-    .log-terminal::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
-    .lightbox { backdrop-filter: blur(8px); }
-    .fade-in { animation: fadeIn 0.2s ease-in; }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
-    body::-webkit-scrollbar { width: 8px; }
-    body::-webkit-scrollbar-thumb { background: #2a2d3a; border-radius: 4px; }
-    body::-webkit-scrollbar-track { background: #0f1117; }
+    .log-terminal::-webkit-scrollbar-thumb { background: #1a1e2e; border-radius: 3px; }
+    .lightbox { backdrop-filter: blur(12px); }
+    .fade-in { animation: fadeIn 0.25s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.01em; }
+    body::-webkit-scrollbar { width: 6px; }
+    body::-webkit-scrollbar-thumb { background: #1a1e2e; border-radius: 3px; }
+    body::-webkit-scrollbar-track { background: #08090d; }
+    /* Subtle glow on cards */
+    .glow-card { box-shadow: 0 0 0 1px rgba(99,102,241,0.04), 0 1px 3px rgba(0,0,0,0.4); }
+    /* Input focus glow */
+    input:focus, select:focus { box-shadow: 0 0 0 2px rgba(129,140,248,0.15) !important; }
   </style>
 </head>
-<body class="bg-surface text-gray-200 min-h-screen">
+<body class="bg-surface text-gray-300 min-h-screen">
   <div class="flex min-h-screen">
     <!-- Sidebar -->
     <nav class="w-56 bg-card border-r border-border flex flex-col fixed h-full">
       <div class="p-5 border-b border-border">
-        <h1 class="text-lg font-bold text-indigo-400">AIGC Prompt Collector</h1>
+        <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">AIGC Prompt Collector</h1>
         <p class="text-xs text-muted mt-1">多平台提示词采集</p>
       </div>
       <div class="flex-1 p-3 space-y-1">
@@ -49,7 +53,7 @@
     </nav>
 
     <!-- Main -->
-    <main class="ml-56 flex-1 p-6">
+    <main class="ml-56 flex-1 p-6 bg-surface">
 
       <!-- Dashboard -->
       <section id="page-dashboard" class="page hidden">
@@ -125,7 +129,7 @@
                 ⏹ 停止
               </button>
             </div>
-            <div id="log-terminal" class="log-terminal flex-1 min-h-[200px] max-h-[500px] bg-black/40 text-emerald-400 rounded-lg p-4 overflow-y-auto whitespace-pre-wrap border border-border">
+            <div id="log-terminal" class="log-terminal flex-1 min-h-[200px] max-h-[500px] bg-black/60 text-emerald-400/90 rounded-lg p-4 overflow-y-auto whitespace-pre-wrap border border-border">
               等待任务启动...
             </div>
           </div>
@@ -306,8 +310,8 @@ function route() {
   const hash = location.hash || '#dashboard';
   document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
   document.querySelectorAll('.nav-link').forEach(a => {
-    a.classList.remove('bg-indigo-500/15', 'text-indigo-400');
-    a.classList.add('text-gray-400', 'hover:bg-white/5');
+    a.classList.remove('bg-indigo-500/10', 'text-indigo-300');
+    a.classList.add('text-gray-500', 'hover:bg-white/[0.03]', 'hover:text-gray-300');
   });
 
   if (hash.startsWith('#note/')) {
@@ -318,8 +322,8 @@ function route() {
     show('page-' + page);
     const link = document.querySelector(`[data-page="${page}"]`);
     if (link) {
-      link.classList.add('bg-indigo-500/15', 'text-indigo-400');
-      link.classList.remove('text-gray-400', 'hover:bg-white/5');
+      link.classList.add('bg-indigo-500/10', 'text-indigo-300');
+      link.classList.remove('text-gray-500', 'hover:bg-white/[0.03]', 'hover:text-gray-300');
     }
     if (page === 'dashboard') loadDashboard();
     if (page === 'notes') { notesPage = 1; loadFilters(); loadNotes(); }
@@ -348,7 +352,7 @@ async function loadDashboard() {
     { label: '总图片', value: d.total_images, color: 'rose' },
   ];
   document.getElementById('stats-cards').innerHTML = cards.map(c => `
-    <div class="bg-card rounded-xl border border-border p-5">
+    <div class="bg-card rounded-xl border border-border p-5 glow-card">
       <p class="text-2xl font-bold text-${c.color}-400">${c.value}</p>
       <p class="text-sm text-muted mt-1">${c.label}</p>
     </div>
@@ -358,7 +362,7 @@ async function loadDashboard() {
   renderBar('chart-models', d.models, 'emerald');
 
   document.getElementById('recent-table').innerHTML = d.recent.map(n => `
-    <tr class="border-b border-border hover:bg-white/5 cursor-pointer" onclick="location.hash='#note/${n.note_id}'">
+    <tr class="border-b border-border hover:bg-white/[0.03] cursor-pointer" onclick="location.hash='#note/${n.note_id}'">
       <td class="py-2.5 text-gray-300">${esc(n.title || '无标题').slice(0, 30)}</td>
       <td><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(n.category)}</span></td>
       <td><span class="bg-emerald-500/20 text-emerald-400 badge">${esc(n.model || '-')}</span></td>
@@ -373,8 +377,8 @@ function renderBar(id, items, color) {
   document.getElementById(id).innerHTML = items.slice(0, 8).map(i => `
     <div class="flex items-center gap-3 mb-2">
       <span class="text-sm w-24 truncate text-right text-gray-400">${esc(i.category || i.model || '-')}</span>
-      <div class="flex-1 bg-white/5 rounded-full h-5 overflow-hidden">
-        <div class="bg-${color}-500/60 h-full rounded-full transition-all" style="width:${(i.count/max*100).toFixed(0)}%"></div>
+      <div class="flex-1 bg-white/[0.03] rounded-full h-5 overflow-hidden">
+        <div class="bg-${color}-500/40 h-full rounded-full transition-all" style="width:${(i.count/max*100).toFixed(0)}%"></div>
       </div>
       <span class="text-sm text-muted w-8">${i.count}</span>
     </div>
@@ -503,7 +507,7 @@ async function loadTaskHistory() {
     stopped: '<span class="bg-amber-500/20 text-amber-400 badge">已停止</span>',
   };
   tbody.innerHTML = tasks.map(t => `
-    <tr class="border-b border-border hover:bg-white/5">
+    <tr class="border-b border-border hover:bg-white/[0.03]">
       <td class="py-2 text-gray-500 font-mono text-xs">${esc(t.id)}</td>
       <td class="py-2"><span class="bg-purple-500/20 text-purple-400 badge">${platformLabel(t.platform)}</span></td>
       <td class="py-2 text-gray-300">${esc(t.keyword)}</td>
@@ -561,7 +565,7 @@ async function loadSchedules() {
   }
   empty.classList.add('hidden');
   tbody.innerHTML = schedules.map(s => `
-    <tr class="border-b border-border hover:bg-white/5">
+    <tr class="border-b border-border hover:bg-white/[0.03]">
       <td class="py-2.5"><span class="bg-purple-500/20 text-purple-400 badge">${platformLabel(s.platform)}</span></td>
       <td class="py-2.5 text-gray-300">${esc(s.keyword)}</td>
       <td class="py-2.5"><span class="bg-indigo-500/20 text-indigo-400 badge">${esc(s.category)}</span></td>
@@ -630,10 +634,10 @@ async function loadNotes() {
   const grid = document.getElementById('notes-grid');
 
   grid.innerHTML = d.notes.map(n => `
-    <a href="#note/${n.note_id}" class="bg-card rounded-xl border border-border overflow-hidden hover:border-indigo-500/50 transition-colors block">
+    <a href="#note/${n.note_id}" class="bg-card rounded-xl border border-border overflow-hidden hover:border-indigo-500/30 transition-all duration-200 block glow-card hover:shadow-lg hover:shadow-indigo-500/[0.03]">
       ${n.thumbnail
         ? `<img src="/api/image-proxy?url=${encodeURIComponent(n.thumbnail)}" class="w-full h-48 object-cover" loading="lazy" onerror="this.style.display='none'">`
-        : `<div class="w-full h-48 bg-white/5 flex items-center justify-center text-gray-600 text-3xl">🖼</div>`}
+        : `<div class="w-full h-48 bg-white/[0.02] flex items-center justify-center text-gray-700 text-3xl">🖼</div>`}
       <div class="p-4">
         <h3 class="text-sm font-medium mb-2 line-clamp-2 text-gray-200">${esc(n.title || '无标题')}</h3>
         <div class="flex items-center gap-2 flex-wrap">
@@ -648,9 +652,9 @@ async function loadNotes() {
 
   const totalPages = Math.ceil(d.total / d.per_page) || 1;
   document.getElementById('notes-pagination').innerHTML = `
-    <button onclick="notesPage=Math.max(1,notesPage-1);loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage <= 1 ? 'opacity-30 pointer-events-none' : 'hover:bg-white/5'}" ${notesPage <= 1 ? 'disabled' : ''}>上一页</button>
+    <button onclick="notesPage=Math.max(1,notesPage-1);loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage <= 1 ? 'opacity-30 pointer-events-none' : 'hover:bg-white/[0.03]'}" ${notesPage <= 1 ? 'disabled' : ''}>上一页</button>
     <span class="text-sm text-muted">${notesPage} / ${totalPages}（共 ${d.total} 条）</span>
-    <button onclick="notesPage++;loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage >= totalPages ? 'opacity-30 pointer-events-none' : 'hover:bg-white/5'}" ${notesPage >= totalPages ? 'disabled' : ''}>下一页</button>
+    <button onclick="notesPage++;loadNotes()" class="px-3 py-1.5 rounded-lg border border-border text-sm text-gray-400 ${notesPage >= totalPages ? 'opacity-30 pointer-events-none' : 'hover:bg-white/[0.03]'}" ${notesPage >= totalPages ? 'disabled' : ''}>下一页</button>
   `;
 }
 
@@ -705,8 +709,8 @@ async function loadDetail(noteId) {
 
   const p = n.prompt || {};
   document.getElementById('detail-prompt').innerHTML = `
-    ${p.prompt_en ? `<div><label class="text-xs text-muted">English Prompt</label><p class="text-sm bg-white/5 p-3 rounded-lg mt-1 font-mono text-gray-300 border border-border">${esc(p.prompt_en)}</p></div>` : ''}
-    ${p.prompt_cn ? `<div><label class="text-xs text-muted">中文提示词</label><p class="text-sm bg-white/5 p-3 rounded-lg mt-1 text-gray-300 border border-border">${esc(p.prompt_cn)}</p></div>` : ''}
+    ${p.prompt_en ? `<div><label class="text-xs text-muted">English Prompt</label><p class="text-sm bg-white/[0.03] p-3 rounded-lg mt-1 font-mono text-gray-300 border border-border">${esc(p.prompt_en)}</p></div>` : ''}
+    ${p.prompt_cn ? `<div><label class="text-xs text-muted">中文提示词</label><p class="text-sm bg-white/[0.03] p-3 rounded-lg mt-1 text-gray-300 border border-border">${esc(p.prompt_cn)}</p></div>` : ''}
     ${p.parameters ? `<div><label class="text-xs text-muted">参数</label><p class="text-sm font-mono text-gray-400 mt-1">${esc(p.parameters)}</p></div>` : ''}
     ${p.style_tags?.length ? `<div><label class="text-xs text-muted">风格标签</label><div class="flex gap-1.5 flex-wrap mt-1">${p.style_tags.map(t => `<span class="bg-amber-500/20 text-amber-400 badge">${esc(t)}</span>`).join('')}</div></div>` : ''}
   `;
