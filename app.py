@@ -289,8 +289,8 @@ async def image_proxy(url: str):
             req_url = url  # Keep full URL with quality params for Twitter
         else:
             referer = "https://www.xiaohongshu.com/"
-            # sns-webpic-qc.xhscdn.com URLs are time-limited; rewrite to stable ci.xiaohongshu.com
-            m = _re.match(r'https?://sns-webpic-qc\.xhscdn\.com/\d+/[a-f0-9]+/(.+)', url)
+            # xhscdn URLs (images + video thumbnails) are time-limited; rewrite to stable ci.xiaohongshu.com
+            m = _re.match(r'https?://sns-(?:webpic-qc|video-qc|video-bd|img-qc|img-bd)\.xhscdn\.com/\d+/[a-f0-9]+/(.+)', url)
             if m:
                 req_url = "https://ci.xiaohongshu.com/" + m.group(1)
             else:

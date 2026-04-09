@@ -32,8 +32,8 @@ BASE_DIR = Path(__file__).parent
 
 
 def _stable_xhs_url(url: str) -> str:
-    """Rewrite time-limited sns-webpic-qc.xhscdn.com URLs to stable ci.xiaohongshu.com."""
-    m = re.match(r'https?://sns-webpic-qc\.xhscdn\.com/\d+/[a-f0-9]+/(.+)', url)
+    """Rewrite time-limited xhscdn.com URLs (images + video thumbnails) to stable ci.xiaohongshu.com."""
+    m = re.match(r'https?://sns-(?:webpic-qc|video-qc|video-bd|img-qc|img-bd)\.xhscdn\.com/\d+/[a-f0-9]+/(.+)', url)
     if m:
         return "https://ci.xiaohongshu.com/" + m.group(1)
     return url
@@ -113,19 +113,32 @@ async def extract_all_images(page: Page) -> list[str]:
         () => {
             const urls = new Set();
             const xhsFilter = u => u && (
-                u.includes('xhscdn') || u.includes('sns-img') || u.includes('ci.xiaohongshu')
+                u.includes('xhscdn') || u.includes('sns-img') || u.includes('sns-video') || u.includes('ci.xiaohongshu')
             ) && !u.includes('avatar') && !u.includes('emoji') && !u.includes('logo');
 
             // All img tags (swiper containers + page-wide)
             document.querySelectorAll('img').forEach(img => {
                 const src = img.src || img.dataset.src || img.getAttribute('data-lazyload') || '';
-                if (src) urls.add(src);
+                if (xhsFilter(src)) urls.add(src);
             });
 
-            // Video poster thumbnails (video notes)
+            // Video poster thumbnails (standard video element)
             document.querySelectorAll('video[poster]').forEach(v => {
                 const poster = v.getAttribute('poster') || '';
-                if (poster) urls.add(poster);
+                if (xhsFilter(poster)) urls.add(poster);
+            });
+
+            // XHS custom video player: cover image inside player container
+            document.querySelectorAll('[class*="cover"] img, [class*="player"] img, [class*="video"] img').forEach(img => {
+                const src = img.src || img.dataset.src || '';
+                if (xhsFilter(src)) urls.add(src);
+            });
+
+            // CSS background-image (XHS video cover often set this way)
+            document.querySelectorAll('[class*="cover"], [class*="thumb"], [class*="poster"]').forEach(el => {
+                const bg = window.getComputedStyle(el).backgroundImage || '';
+                const m = bg.match(/url\\(["']?([^"')]+)["']?\\)/);
+                if (m && xhsFilter(m[1])) urls.add(m[1]);
             });
 
             // JSON-LD structured data
