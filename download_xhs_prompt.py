@@ -31,6 +31,14 @@ COOKIE_FILE = Path(__file__).parent / "xhs_auth.json"
 BASE_DIR = Path(__file__).parent
 
 
+def _stable_xhs_url(url: str) -> str:
+    """Rewrite time-limited sns-webpic-qc.xhscdn.com URLs to stable ci.xiaohongshu.com."""
+    m = re.match(r'https?://sns-webpic-qc\.xhscdn\.com/\d+/[a-f0-9]+/(.+)', url)
+    if m:
+        return "https://ci.xiaohongshu.com/" + m.group(1)
+    return url
+
+
 # ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
@@ -85,9 +93,10 @@ class Database:
         self.conn.commit()
 
     def insert_images(self, note_id: str, urls: list[str]):
+        stable = [_stable_xhs_url(u) for u in urls]
         self.conn.executemany(
             "INSERT OR IGNORE INTO images (note_id, image_index, url) VALUES (?, ?, ?)",
-            [(note_id, i, url) for i, url in enumerate(urls)],
+            [(note_id, i, url) for i, url in enumerate(stable)],
         )
         self.conn.commit()
 
@@ -99,26 +108,38 @@ class Database:
 # Carousel image extraction
 # ---------------------------------------------------------------------------
 async def extract_all_images(page: Page) -> list[str]:
-    """Extract all image URLs from a note detail page, including carousel."""
+    """Extract all image/video-thumbnail URLs from a note detail page, including carousel."""
     img_urls = await page.evaluate("""
         () => {
             const urls = new Set();
+            const xhsFilter = u => u && (
+                u.includes('xhscdn') || u.includes('sns-img') || u.includes('ci.xiaohongshu')
+            ) && !u.includes('avatar') && !u.includes('emoji') && !u.includes('logo');
+
             // All img tags (swiper containers + page-wide)
             document.querySelectorAll('img').forEach(img => {
                 const src = img.src || img.dataset.src || img.getAttribute('data-lazyload') || '';
                 if (src) urls.add(src);
             });
+
+            // Video poster thumbnails (video notes)
+            document.querySelectorAll('video[poster]').forEach(v => {
+                const poster = v.getAttribute('poster') || '';
+                if (poster) urls.add(poster);
+            });
+
             // JSON-LD structured data
             document.querySelectorAll('script[type="application/ld+json"]').forEach(s => {
                 try {
                     const data = JSON.parse(s.textContent);
                     const images = Array.isArray(data.image) ? data.image : (data.image ? [data.image] : []);
                     images.forEach(u => urls.add(typeof u === 'string' ? u : u.url || ''));
+                    // thumbnailUrl field for video content
+                    if (data.thumbnailUrl) urls.add(data.thumbnailUrl);
                 } catch(e) {}
             });
-            return [...urls].filter(u => u && (
-                u.includes('xhscdn') || u.includes('sns-img') || u.includes('ci.xiaohongshu')
-            ) && !u.includes('avatar') && !u.includes('emoji') && !u.includes('logo'));
+
+            return [...urls].filter(xhsFilter);
         }
     """)
 
@@ -222,8 +243,10 @@ MODEL_ALIASES = {
     "FLUX": ["flux", "flux.1", "flux1", "flux 1", "flux.2", "flux 2", "flux2",
              "flux.2 klein", "flux klein", "flux pro", "flux dev", "flux schnell"],
     "Seedream": ["seedream", "seed dream", "seedream5", "seedream5.0",
-                 "seedream5.0 lite", "seedream 5.0", "seedance", "seedance2.0",
-                 "seedream5.0 lite / seedance2.0"],
+                 "seedream5.0 lite", "seedream 5.0"],
+    "Seedance": ["seedance", "seedance2.0", "seedance2", "seedance 2.0",
+                 "seedance 2", "seedance1.0", "seedance1", "seedance 1.0",
+                 "seed dance", "seedream5.0 lite / seedance2.0"],
     "NanoBanana": ["nanobanana", "nano banana", "nano-banana", "banana", "banana2",
                    "banana pro", "bananapro", "banana-pro", "banana 2",
                    "nano banana 2", "lovart", "lovart (nano banana 2)",
@@ -247,17 +270,18 @@ def normalize_model(raw: str) -> str:
     return canonical if canonical in VALID_MODELS else ""
 
 
-PROMPT_SYSTEM = """你是 AI 图像生成提示词提取专家。从小红书笔记中提取提示词信息。
-如果笔记包含 AI 图像生成提示词，返回严格 JSON（不要 markdown 代码块）：
+PROMPT_SYSTEM = """你是 AI 图像/视频生成提示词提取专家。从小红书笔记中提取提示词信息。
+如果笔记包含 AI 图像或视频生成提示词，返回严格 JSON（不要 markdown 代码块）：
 {"prompt_en": "英文提示词", "prompt_cn": "中文提示词", "model": "模型名", "parameters": "参数", "style_tags": ["标签"]}
 - prompt_en / prompt_cn: 至少有一个非空
-- model: 必须是以下之一（严格匹配）: Midjourney, FLUX, Seedream, NanoBanana
-  - 别名对照: MJ/Mid Journey → Midjourney, Flux.1/Flux1 → FLUX, Nano Banana → NanoBanana, Seed Dream → Seedream
+- model: 必须是以下之一（严格匹配）: Midjourney, FLUX, Seedream, Seedance, NanoBanana
+  - 别名对照: MJ/Mid Journey → Midjourney, Flux.1/Flux1 → FLUX, Nano Banana → NanoBanana, Seed Dream → Seedream, Seedance2.0/Seed Dance → Seedance
+  - Seedream 是字节跳动图像生成模型，Seedance 是字节跳动视频生成模型，注意区分
   - 如果笔记中的模型不属于以上任何一个，model 填空字符串 ""
-- parameters: 如 --ar 16:9, --v 6, steps, cfg 等
+- parameters: 如 --ar 16:9, --v 6, steps, cfg, 分辨率, 时长等
 - style_tags: 风格关键词列表
 
-如果笔记不包含任何 AI 图像生成提示词，返回空 JSON: {}"""
+如果笔记不包含任何 AI 图像或视频生成提示词，返回空 JSON: {}"""
 
 
 async def extract_prompt(client: httpx.AsyncClient, title: str, description: str) -> str | None:
@@ -338,7 +362,7 @@ async def main():
 
         search_url = f"https://www.xiaohongshu.com/search_result?keyword={args.keyword}&type=51"
         print(f"🔍 搜索: {args.keyword}")
-        await page.goto(search_url)
+        await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(4000)
 
         if await page.query_selector("input[placeholder*='手机号'], .login-container"):
@@ -373,7 +397,7 @@ async def main():
                 print(f"\n📌 [{idx}/{len(note_urls)}] {note_id}")
 
                 try:
-                    await page.goto(full_url)
+                    await page.goto(full_url, wait_until="domcontentloaded", timeout=60000)
                     await page.wait_for_timeout(3000)
 
                     # Detect error/block pages

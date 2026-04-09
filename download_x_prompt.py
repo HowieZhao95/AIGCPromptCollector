@@ -100,21 +100,47 @@ class Database:
 # Tweet image extraction
 # ---------------------------------------------------------------------------
 async def extract_all_images(page: Page) -> list[str]:
-    """Extract all image URLs from a tweet, including multi-image posts."""
+    """Extract all image/video-thumbnail URLs from a tweet."""
+    # Small scroll to trigger lazy-loading
+    await page.evaluate("window.scrollBy(0, 300)")
+    await page.wait_for_timeout(800)
+
     return await page.evaluate("""
         () => {
             const urls = new Set();
-            // Tweet images (exclude profile pics, emojis, external links)
-            document.querySelectorAll('img[src*="pbs.twimg.com/media"]').forEach(img => {
-                let src = img.src || '';
-                // Get highest quality: replace format params
-                if (src.includes('?')) {
-                    src = src.split('?')[0] + '?format=jpg&name=large';
-                } else if (!src.includes('name=')) {
-                    src += '?format=jpg&name=large';
-                }
-                urls.add(src);
+            const twimgBase = (src) => {
+                if (!src || !src.includes('pbs.twimg.com')) return null;
+                const base = src.split('?')[0];
+                // Media images: request highest quality
+                if (base.includes('/media/')) return base + '?format=jpg&name=large';
+                // Video thumbnails: already direct JPEG/PNG, keep as-is
+                if (base.includes('_video_thumb') ||
+                    base.includes('amplify_video') ||
+                    base.includes('tweet_video_thumb')) return base;
+                return null;
+            };
+
+            // All img tags (covers lazy-loaded via src / data-src)
+            document.querySelectorAll('img').forEach(img => {
+                const src = img.src || img.dataset.src || img.getAttribute('data-lazy-src') || '';
+                const url = twimgBase(src);
+                if (url) urls.add(url);
             });
+
+            // Video poster thumbnails
+            document.querySelectorAll('video[poster]').forEach(v => {
+                const url = twimgBase(v.getAttribute('poster') || '');
+                if (url) urls.add(url);
+            });
+
+            // Twitter card images
+            document.querySelectorAll(
+                '[data-testid="card.layoutLarge.media"] img, [data-testid="card.layoutSmall.media"] img'
+            ).forEach(img => {
+                const url = twimgBase(img.src || '');
+                if (url) urls.add(url);
+            });
+
             return [...urls];
         }
     """)
@@ -210,8 +236,10 @@ MODEL_ALIASES = {
     "FLUX": ["flux", "flux.1", "flux1", "flux 1", "flux.2", "flux 2", "flux2",
              "flux.2 klein", "flux klein", "flux pro", "flux dev", "flux schnell"],
     "Seedream": ["seedream", "seed dream", "seedream5", "seedream5.0",
-                 "seedream5.0 lite", "seedream 5.0", "seedance", "seedance2.0",
-                 "seedream5.0 lite / seedance2.0"],
+                 "seedream5.0 lite", "seedream 5.0"],
+    "Seedance": ["seedance", "seedance2.0", "seedance2", "seedance 2.0",
+                 "seedance 2", "seedance1.0", "seedance1", "seedance 1.0",
+                 "seed dance", "seedream5.0 lite / seedance2.0"],
     "NanoBanana": ["nanobanana", "nano banana", "nano-banana", "banana", "banana2",
                    "banana pro", "bananapro", "banana-pro", "banana 2",
                    "nano banana 2", "lovart", "lovart (nano banana 2)",
@@ -232,17 +260,18 @@ def normalize_model(raw: str) -> str:
     return canonical if canonical in VALID_MODELS else ""
 
 
-PROMPT_SYSTEM = """你是 AI 图像生成提示词提取专家。从社交媒体帖子中提取提示词信息。
-如果帖子包含 AI 图像生成提示词，返回严格 JSON（不要 markdown 代码块）：
+PROMPT_SYSTEM = """你是 AI 图像/视频生成提示词提取专家。从社交媒体帖子中提取提示词信息。
+如果帖子包含 AI 图像或视频生成提示词，返回严格 JSON（不要 markdown 代码块）：
 {"prompt_en": "英文提示词", "prompt_cn": "中文提示词", "model": "模型名", "parameters": "参数", "style_tags": ["标签"]}
 - prompt_en / prompt_cn: 至少有一个非空
-- model: 必须是以下之一（严格匹配）: Midjourney, FLUX, Seedream, NanoBanana
-  - 别名对照: MJ/Mid Journey → Midjourney, Flux.1/Flux1 → FLUX, Nano Banana → NanoBanana, Seed Dream → Seedream
+- model: 必须是以下之一（严格匹配）: Midjourney, FLUX, Seedream, Seedance, NanoBanana
+  - 别名对照: MJ/Mid Journey → Midjourney, Flux.1/Flux1 → FLUX, Nano Banana → NanoBanana, Seed Dream → Seedream, Seedance2.0/Seed Dance → Seedance
+  - Seedream 是字节跳动图像生成模型，Seedance 是字节跳动视频生成模型，注意区分
   - 如果帖子中的模型不属于以上任何一个，model 填空字符串 ""
-- parameters: 如 --ar 16:9, --v 6, steps, cfg 等
+- parameters: 如 --ar 16:9, --v 6, steps, cfg, 分辨率, 时长等
 - style_tags: 风格关键词列表
 
-如果帖子不包含任何 AI 图像生成提示词，返回空 JSON: {}"""
+如果帖子不包含任何 AI 图像或视频生成提示词，返回空 JSON: {}"""
 
 
 async def extract_prompt(client: httpx.AsyncClient, title: str, description: str) -> str | None:
@@ -313,7 +342,7 @@ async def main():
         # Search with image filter
         search_url = f"https://x.com/search?q={args.keyword}&src=typed_query&f=top"
         print(f"🔍 搜索: {args.keyword}")
-        await page.goto(search_url)
+        await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(4000)
 
         # Login check
@@ -347,7 +376,7 @@ async def main():
                 print(f"\n📌 [{idx}/{len(tweet_links)}] {tweet_id}")
 
                 try:
-                    await page.goto(full_url)
+                    await page.goto(full_url, wait_until="domcontentloaded", timeout=60000)
                     await page.wait_for_timeout(3000)
 
                     # Detect error pages

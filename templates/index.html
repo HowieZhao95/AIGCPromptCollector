@@ -354,8 +354,10 @@ const I18N = {
     'settings.key_empty': '请输入 API Key', 'settings.saved': '保存成功', 'settings.save_fail': '保存失败',
     'settings.logged_in': '已登录', 'settings.not_logged_in': '未登录',
     'settings.relogin': '🔄 重新登录', 'settings.login': '🔑 登录',
-    'settings.save_cookie': '✅ 保存 Cookie', 'settings.cancel': '取消',
-    'settings.browser_hint': '浏览器已打开，请完成登录后点击保存',
+    'settings.cancel': '取消',
+    'settings.detecting': '正在检测登录...',
+    'settings.login_success': '登录成功，Cookie 已保存',
+    'settings.login_fail': '登录失败，请重试',
     'settings.cookie_fail': '无法获取状态',
     'login.not_logged_in': '未登录',
     'platform.not_logged_in': '(未登录)',
@@ -404,8 +406,10 @@ const I18N = {
     'settings.key_empty': 'Please enter an API Key', 'settings.saved': 'Saved', 'settings.save_fail': 'Save failed',
     'settings.logged_in': 'Logged in', 'settings.not_logged_in': 'Not logged in',
     'settings.relogin': '🔄 Re-login', 'settings.login': '🔑 Login',
-    'settings.save_cookie': '✅ Save Cookie', 'settings.cancel': 'Cancel',
-    'settings.browser_hint': 'Browser opened. Log in then click Save.',
+    'settings.cancel': 'Cancel',
+    'settings.detecting': 'Detecting login...',
+    'settings.login_success': 'Login successful, Cookie saved',
+    'settings.login_fail': 'Login failed, please retry',
     'settings.cookie_fail': 'Unable to get status',
     'login.not_logged_in': 'Not logged in',
     'platform.not_logged_in': '(not logged in)',
@@ -891,11 +895,16 @@ async function loadSettings() {
     }
     cookie.innerHTML = Object.entries(cs).map(([key, p]) => {
       const ls = loginStates[key] || { active: false };
-      const loginBtn = ls.active
-        ? `<button onclick="saveLoginCookie('${key}')" class="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs hover:bg-emerald-500 transition-colors">${t('settings.save_cookie')}</button>
-           <button onclick="cancelLogin('${key}')" class="px-3 py-1 bg-red-600/50 text-red-300 rounded-lg text-xs hover:bg-red-600 transition-colors">${t('settings.cancel')}</button>
-           <span class="text-xs text-amber-400 ml-1">${t('settings.browser_hint')}</span>`
-        : `<button onclick="startLogin('${key}')" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-500 transition-colors">${p.exists ? t('settings.relogin') : t('settings.login')}</button>`;
+      let loginBtn;
+      if (ls.active) {
+        loginBtn = `<span class="flex items-center gap-1.5 text-xs text-amber-400">
+          <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+          ${t('settings.detecting')}
+        </span>
+        <button onclick="cancelLogin('${key}')" class="px-3 py-1 bg-red-600/50 text-red-300 rounded-lg text-xs hover:bg-red-600 transition-colors">${t('settings.cancel')}</button>`;
+      } else {
+        loginBtn = `<button onclick="startLogin('${key}')" class="px-3 py-1 bg-indigo-600 text-white rounded-lg text-xs hover:bg-indigo-500 transition-colors">${p.exists ? t('settings.relogin') : t('settings.login')}</button>`;
+      }
       return `
         <div class="flex items-center gap-2 mb-3 flex-wrap">
           <span class="text-sm text-gray-300 w-28">${esc(p.name)}</span>
@@ -935,24 +944,53 @@ function toggleKeyVisibility() {
 // ---------------------------------------------------------------------------
 // Login
 // ---------------------------------------------------------------------------
+const _loginPollers = {};
+
 async function startLogin(platform) {
   const res = await (await fetch('/api/login/' + platform, { method: 'POST' })).json();
   if (res.error) { alert(res.error); return; }
-  // Refresh settings to show "save" button
-  setTimeout(() => loadSettings(), 1500);
+  // Show spinner immediately, then start polling
+  loadSettings();
+  _startLoginPoller(platform);
 }
 
-async function saveLoginCookie(platform) {
-  const res = await (await fetch('/api/login/' + platform + '/save', { method: 'POST' })).json();
-  if (res.error) { alert(res.error); return; }
-  alert(res.message || '保存成功');
-  loadSettings();
-  // Refresh platform dropdowns
-  _platforms = null;
+function _startLoginPoller(platform) {
+  if (_loginPollers[platform]) return;
+  _loginPollers[platform] = setInterval(async () => {
+    try {
+      const s = await (await fetch('/api/login/' + platform + '/status')).json();
+      const result = s.result;
+      const done = !s.active && result && result.status !== 'pending';
+      if (!done) return; // Still in progress — spinner already shown, nothing to update
+      clearInterval(_loginPollers[platform]);
+      delete _loginPollers[platform];
+      if (result.status === 'saved') {
+        _showLoginToast(result.message || t('settings.login_success'), 'success');
+        _platforms = null;
+      } else if (result.status === 'timeout' || result.status === 'error') {
+        _showLoginToast(result.message || t('settings.login_fail'), 'error');
+      }
+      loadSettings();
+    } catch(e) {
+      clearInterval(_loginPollers[platform]);
+      delete _loginPollers[platform];
+    }
+  }, 2000);
+}
+
+function _showLoginToast(msg, type) {
+  const el = document.createElement('div');
+  const color = type === 'success' ? 'bg-emerald-600' : 'bg-red-600';
+  el.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-white text-sm shadow-lg ${color} transition-opacity duration-500`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 500); }, 3000);
 }
 
 async function cancelLogin(platform) {
   await fetch('/api/login/' + platform + '/cancel', { method: 'POST' });
+  clearInterval(_loginPollers[platform]);
+  delete _loginPollers[platform];
   loadSettings();
 }
 

@@ -4,14 +4,21 @@ AIGC Prompt Collector — FastAPI 后端
 """
 
 import asyncio
+import hashlib
 import json
 import os
+import shutil
 import sqlite3
+import subprocess
 import sys
+import tempfile
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
+
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 import httpx
 from fastapi import FastAPI, Query, Request
@@ -37,7 +44,7 @@ PLATFORMS = {
         "scraper": str(Path(__file__).parent / "download_x_prompt.py"),
         "cookie": Path(__file__).parent / "x_auth.json",
         "login_script": "save_login_x.py",
-        "login_url": "https://x.com/login",
+        "login_url": "https://x.com/home",
     },
 }
 
@@ -47,8 +54,10 @@ _running: dict[str, dict] = {}
 _active_schedules: set[str] = set()
 # Shared HTTP client for image proxy (created at startup)
 _http_client: httpx.AsyncClient | None = None
-# Active login sessions: platform -> { browser, context, status }
+# Active login sessions: platform -> { browser, context, page }
 _login_sessions: dict[str, dict] = {}
+# Recent auto-login results: platform -> { status, message }
+_login_results: dict[str, dict] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -272,6 +281,7 @@ async def get_note(note_id: str):
 # ---------------------------------------------------------------------------
 @app.get("/api/image-proxy")
 async def image_proxy(url: str):
+    import re as _re
     try:
         # Choose Referer based on image domain
         if "pbs.twimg.com" in url or "twimg.com" in url:
@@ -279,7 +289,12 @@ async def image_proxy(url: str):
             req_url = url  # Keep full URL with quality params for Twitter
         else:
             referer = "https://www.xiaohongshu.com/"
-            req_url = url.split("?")[0]
+            # sns-webpic-qc.xhscdn.com URLs are time-limited; rewrite to stable ci.xiaohongshu.com
+            m = _re.match(r'https?://sns-webpic-qc\.xhscdn\.com/\d+/[a-f0-9]+/(.+)', url)
+            if m:
+                req_url = "https://ci.xiaohongshu.com/" + m.group(1)
+            else:
+                req_url = url.split("?")[0]
         resp = await _http_client.get(
             req_url,
             headers={
@@ -534,72 +549,213 @@ async def cookie_status():
 
 
 # ---------------------------------------------------------------------------
-# API: Login (launch browser for manual login)
+# API: Login
+# X (Twitter): read cookies directly from Chrome DB — no browser launch
+# XHS: open Playwright browser, auto-detect login, auto-save
 # ---------------------------------------------------------------------------
+
+def _extract_x_cookies_from_chrome() -> list[dict]:
+    """
+    Read X.com cookies directly from Chrome's SQLite cookie database.
+    Decrypts using the Chrome Safe Storage key from macOS Keychain.
+    Returns a list of cookie dicts compatible with Playwright storage_state.
+    """
+    cookie_db = (
+        Path.home() / "Library" / "Application Support"
+        / "Google" / "Chrome" / "Default" / "Cookies"
+    )
+    if not cookie_db.exists():
+        raise FileNotFoundError("Chrome Cookie 数据库未找到，请确认已安装 Google Chrome")
+
+    # Get encryption key from macOS Keychain
+    r = subprocess.run(
+        ["security", "find-generic-password", "-w", "-s", "Chrome Safe Storage", "-a", "Chrome"],
+        capture_output=True, text=True,
+    )
+    if r.returncode != 0:
+        raise RuntimeError("无法读取 Chrome 加密密钥，请确认 Chrome 已安装并运行过")
+    password = r.stdout.strip().encode()
+    key = hashlib.pbkdf2_hmac("sha1", password, b"saltysalt", 1003, dklen=16)
+
+    def decrypt(enc: bytes) -> str:
+        if enc[:3] == b"v10":
+            enc = enc[3:]
+            iv = b" " * 16
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            dec = cipher.decryptor()
+            raw = dec.update(enc) + dec.finalize()
+            pad = raw[-1]
+            # Chrome prepends 32 bytes of random nonce before the actual value
+            return raw[32:-pad].decode("utf-8", errors="replace")
+        return enc.decode("utf-8", errors="replace")
+
+    # samesite column: -1=unspecified, 0=None, 1=Lax, 2=Strict
+    _SAMESITE = {0: "None", 1: "Lax", 2: "Strict"}
+
+    # Copy DB to temp (Chrome may hold a lock on the original)
+    tmp_db = tempfile.mktemp(suffix=".db")
+    shutil.copy2(cookie_db, tmp_db)
+    try:
+        conn = sqlite3.connect(tmp_db)
+        rows = conn.execute(
+            """SELECT host_key, name, path, expires_utc, is_secure, is_httponly,
+                      encrypted_value, samesite
+               FROM cookies
+               WHERE host_key LIKE '%.x.com' OR host_key = 'x.com'
+                  OR host_key LIKE '%.twitter.com' OR host_key = 'twitter.com'"""
+        ).fetchall()
+        conn.close()
+    finally:
+        Path(tmp_db).unlink(missing_ok=True)
+
+    cookies = []
+    for host, name, path, expires_utc, is_secure, is_httponly, enc_value, samesite in rows:
+        if not name:
+            continue
+        try:
+            value = decrypt(enc_value)
+        except Exception:
+            value = ""
+        # Chrome epoch → Unix timestamp; use -1 for session/expired cookies
+        expires = int(expires_utc / 1_000_000 - 11_644_473_600) if expires_utc else -1
+        if expires != -1 and expires < 0:
+            expires = -1
+        cookies.append({
+            "name": name,
+            "value": value,
+            "domain": host,
+            "path": path or "/",
+            "expires": expires,
+            "httpOnly": bool(is_httponly),
+            "secure": bool(is_secure),
+            "sameSite": _SAMESITE.get(samesite, "Lax"),
+        })
+    return cookies
+
+
+async def _close_login_session(session: dict):
+    """Close browser/context and clean up temp dir."""
+    try:
+        if session.get("browser"):
+            await session["browser"].close()
+        else:
+            await session["context"].close()
+        await session["pw"].stop()
+    except Exception:
+        pass
+
+
+async def _auto_detect_and_save(platform: str):
+    """Poll XHS browser until login detected, then auto-save and close."""
+    pcfg = PLATFORMS[platform]
+    await asyncio.sleep(4)  # Give browser time to open
+
+    max_wait = 300  # 5 min timeout
+    elapsed = 0
+    while elapsed < max_wait:
+        session = _login_sessions.get(platform)
+        if not session:
+            return
+        try:
+            page = session["page"]
+            url = page.url
+            has_modal = await page.evaluate(
+                "() => !!document.querySelector('input[placeholder*=\"手机号\"], .login-container, [class*=\"login-modal\"]')"
+            )
+            if "xiaohongshu.com" in url and not has_modal:
+                await session["context"].storage_state(path=str(pcfg["cookie"]))
+                _login_results[platform] = {"status": "saved", "message": f"{pcfg['name']} 登录成功"}
+                _login_sessions.pop(platform, None)
+                await _close_login_session(session)
+                print(f"✅ [{platform}] 自动登录成功")
+                return
+        except Exception as e:
+            print(f"[login-detect] {platform}: {e}")
+        await asyncio.sleep(2)
+        elapsed += 2
+
+    session = _login_sessions.pop(platform, None)
+    if session:
+        _login_results[platform] = {"status": "timeout", "message": "登录超时，请重试"}
+        await _close_login_session(session)
+
+
 @app.post("/api/login/{platform}")
 async def start_login(platform: str):
-    """Open a browser for the user to log in manually."""
+    """
+    X: extract cookies directly from Chrome DB (no browser launch).
+    XHS: open Playwright browser and auto-detect login.
+    """
     if platform not in PLATFORMS:
         return {"error": f"不支持的平台: {platform}"}
     if platform in _login_sessions:
-        return {"error": "该平台已有登录窗口打开中，请先完成或取消"}
+        return {"error": "该平台已有登录窗口打开中"}
     pcfg = PLATFORMS[platform]
+    _login_results.pop(platform, None)
 
+    if platform == "x":
+        # Direct cookie extraction — no browser needed
+        # Set pending so the frontend poller knows to keep waiting
+        _login_results["x"] = {"status": "pending", "message": "正在从 Chrome 读取 Cookie..."}
+
+        async def _extract():
+            try:
+                cookies = await asyncio.get_event_loop().run_in_executor(
+                    None, _extract_x_cookies_from_chrome
+                )
+                if not cookies:
+                    _login_results["x"] = {"status": "error", "message": "未在 Chrome 中找到 X 的登录信息，请先在 Chrome 里登录 x.com"}
+                    return
+                state = {"cookies": cookies, "origins": []}
+                pcfg["cookie"].write_text(json.dumps(state, ensure_ascii=False))
+                _login_results["x"] = {"status": "saved", "message": "X (Twitter) Cookie 已从 Chrome 导入"}
+                print("✅ [x] Cookie 从 Chrome 直接导入成功")
+            except Exception as e:
+                _login_results["x"] = {"status": "error", "message": str(e)}
+
+        asyncio.create_task(_extract())
+        return {"ok": True}
+
+    # XHS: open browser
     async def _open_browser():
         from playwright.async_api import async_playwright
         pw = await async_playwright().start()
-        browser = await pw.chromium.launch(headless=False)
-        context = await browser.new_context()
-        page = await context.new_page()
-        await page.goto(pcfg["login_url"])
-        _login_sessions[platform] = {
-            "pw": pw, "browser": browser, "context": context,
-            "status": "waiting",  # waiting | saved | error
-        }
+        try:
+            browser = await pw.chromium.launch(headless=False)
+            context = await browser.new_context()
+            page = await context.new_page()
+            await page.goto(pcfg["login_url"])
+            _login_sessions[platform] = {
+                "pw": pw, "browser": browser, "context": context, "page": page,
+            }
+            asyncio.create_task(_auto_detect_and_save(platform))
+        except Exception as e:
+            _login_results[platform] = {"status": "error", "message": f"启动失败: {e}"}
+            try:
+                await pw.stop()
+            except Exception:
+                pass
 
     asyncio.create_task(_open_browser())
-    return {"ok": True, "message": f"正在打开 {pcfg['name']} 登录页面..."}
-
-
-@app.post("/api/login/{platform}/save")
-async def save_login(platform: str):
-    """Save cookies from the open browser session."""
-    if platform not in _login_sessions:
-        return {"error": "没有打开的登录窗口"}
-    session = _login_sessions[platform]
-    pcfg = PLATFORMS[platform]
-    try:
-        await session["context"].storage_state(path=str(pcfg["cookie"]))
-        session["status"] = "saved"
-        await session["browser"].close()
-        await session["pw"].stop()
-        del _login_sessions[platform]
-        return {"ok": True, "message": f"{pcfg['name']} Cookie 已保存"}
-    except Exception as e:
-        session["status"] = "error"
-        return {"error": f"保存失败: {e}"}
+    return {"ok": True}
 
 
 @app.post("/api/login/{platform}/cancel")
 async def cancel_login(platform: str):
-    """Close the login browser without saving."""
-    if platform not in _login_sessions:
-        return {"error": "没有打开的登录窗口"}
-    session = _login_sessions.pop(platform)
-    try:
-        await session["browser"].close()
-        await session["pw"].stop()
-    except Exception:
-        pass
+    """Abort the login session."""
+    session = _login_sessions.pop(platform, None)
+    if session:
+        await _close_login_session(session)
     return {"ok": True}
 
 
 @app.get("/api/login/{platform}/status")
 async def login_status(platform: str):
-    """Check if a login session is active."""
+    """Poll login progress."""
+    result = _login_results.get(platform)
     if platform in _login_sessions:
-        return {"active": True, "status": _login_sessions[platform]["status"]}
-    return {"active": False}
+        return {"active": True, "status": _login_sessions[platform]["status"], "result": result}
+    return {"active": False, "result": result}
 
 
 @app.put("/api/settings")
