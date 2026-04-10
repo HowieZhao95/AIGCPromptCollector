@@ -233,9 +233,9 @@ async def scroll_and_collect_notes(page: Page, max_notes: int) -> list[str]:
         hrefs: list[str] = await page.evaluate("""
             () => {
                 const hrefs = new Set();
-                // All anchor tags — filter by note URL patterns
+                // Use a.href (absolute URL) to preserve xsec_token query params
                 document.querySelectorAll('a[href]').forEach(a => {
-                    const h = a.getAttribute('href') || '';
+                    const h = a.href || '';
                     if (/\\/explore\\/[a-f0-9]{24}/.test(h) ||
                         /\\/discovery\\/item\\/[a-f0-9]{24}/.test(h) ||
                         /\\/note\\/[a-f0-9]{24}/.test(h)) {
@@ -439,7 +439,8 @@ async def main():
                     skipped += 1
                     continue
 
-                full_url = f"https://www.xiaohongshu.com{note_href}" if note_href.startswith("/") else note_href
+                # note_href is already an absolute URL (from a.href) with xsec_token preserved
+                full_url = note_href if note_href.startswith("http") else f"https://www.xiaohongshu.com{note_href}"
                 print(f"\n📌 [{idx}/{len(note_urls)}] {note_id}")
 
                 try:
