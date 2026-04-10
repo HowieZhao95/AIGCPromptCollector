@@ -224,18 +224,22 @@ async def scroll_and_collect_notes(page: Page, max_notes: int) -> list[str]:
     print(f"  📄 页面: {(await page.title())[:60]} | URL: {page.url[:80]}")
 
     for round_i in range(25):
-        # getAttribute('href') returns the raw HTML attribute value which includes xsec_token
+        # Use a.cover links which contain xsec_token in /search_result/ hrefs
+        # (the /explore/ hrefs are hidden duplicates WITHOUT the token)
         hrefs: list[str] = await page.evaluate("""
             () => {
                 const hrefs = new Set();
-                document.querySelectorAll('a[href]').forEach(a => {
+                document.querySelectorAll('section.note-item a.cover').forEach(a => {
                     const h = a.getAttribute('href') || '';
-                    if (/\/explore\/[a-f0-9]{24}/.test(h) ||
-                        /\/discovery\/item\/[a-f0-9]{24}/.test(h) ||
-                        /\/note\/[a-f0-9]{24}/.test(h)) {
-                        hrefs.add(h);
-                    }
+                    if (h) hrefs.add(h);
                 });
+                if (hrefs.size === 0) {
+                    // Fallback: any link with xsec_token
+                    document.querySelectorAll('a[href*="xsec_token"]').forEach(a => {
+                        const h = a.getAttribute('href') || '';
+                        if (h) hrefs.add(h);
+                    });
+                }
                 return [...hrefs];
             }
         """)
