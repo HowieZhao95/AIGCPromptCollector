@@ -220,30 +220,51 @@ async def scroll_and_collect_notes(page: Page, max_notes: int) -> list[str]:
     seen = set()
     collected = []
 
-    for _ in range(20):
-        cards = await page.query_selector_all("section.note-item a.cover")
-        if not cards:
-            cards = await page.query_selector_all("a[href*='/search_result/']")
-        if not cards:
-            cards = await page.query_selector_all("a[href*='/explore/']")
-        if not cards:
-            cards = await page.query_selector_all("a[href*='/note/']")
+    # Extra wait for XHS SPA to fully render search results
+    await page.wait_for_timeout(3000)
+
+    # Debug: print current URL and page title
+    current_url = page.url
+    title = await page.title()
+    print(f"  📄 页面: {title[:60]} | URL: {current_url[:80]}")
+
+    for round_i in range(25):
+        # Try progressively broader selectors
+        hrefs: list[str] = await page.evaluate("""
+            () => {
+                const hrefs = new Set();
+                // All anchor tags — filter by note URL patterns
+                document.querySelectorAll('a[href]').forEach(a => {
+                    const h = a.getAttribute('href') || '';
+                    if (/\\/explore\\/[a-f0-9]{24}/.test(h) ||
+                        /\\/discovery\\/item\\/[a-f0-9]{24}/.test(h) ||
+                        /\\/note\\/[a-f0-9]{24}/.test(h)) {
+                        hrefs.add(h);
+                    }
+                });
+                return [...hrefs];
+            }
+        """)
 
         prev_count = len(seen)
-        for card in cards:
-            href = await card.get_attribute("href")
-            if href and href not in seen:
+        for href in hrefs:
+            if href not in seen:
                 seen.add(href)
                 collected.append(href)
+
+        if round_i == 0 and len(collected) == 0:
+            # First round found nothing — print debug info
+            snippet = await page.evaluate("document.body?.innerText?.slice(0, 300) || ''")
+            print(f"  ⚠️ 第1轮未找到笔记链接，页面文本片段:\n{snippet}")
 
         if len(collected) >= max_notes:
             break
 
-        await page.evaluate("window.scrollBy(0, 800)")
-        await page.wait_for_timeout(1500)
+        await page.evaluate("window.scrollBy(0, 900)")
+        await page.wait_for_timeout(1800)
 
-        if len(seen) == prev_count:
-            break  # No new content
+        if len(seen) == prev_count and round_i >= 2:
+            break  # No new content after a few tries
 
     return collected[:max_notes]
 
@@ -373,10 +394,18 @@ async def main():
         )
         page = await context.new_page()
 
-        search_url = f"https://www.xiaohongshu.com/search_result?keyword={args.keyword}&type=51"
+        keyword_encoded = args.keyword.replace(" ", "%20")
+        search_url = f"https://www.xiaohongshu.com/search_result?keyword={keyword_encoded}&source=web_search_result_notes&type=51"
         print(f"🔍 搜索: {args.keyword}")
         await page.goto(search_url, wait_until="domcontentloaded", timeout=60000)
-        await page.wait_for_timeout(4000)
+        # Wait for at least one note link to appear (or timeout after 10s)
+        try:
+            await page.wait_for_selector(
+                'a[href*="/explore/"], a[href*="/discovery/item/"], section.note-item',
+                timeout=10000
+            )
+        except Exception:
+            pass  # Will still attempt scraping even if wait times out
 
         if await page.query_selector("input[placeholder*='手机号'], .login-container"):
             print("⚠️  Cookie 已过期，请重新运行 save_login.py")
