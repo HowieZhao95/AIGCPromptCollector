@@ -345,7 +345,11 @@ async def extract_prompt(client: httpx.AsyncClient, title: str, description: str
         if result.startswith("```"):
             result = re.sub(r'^```(?:json)?\s*', '', result)
             result = re.sub(r'\s*```$', '', result)
-        parsed = json.loads(result)
+        # Extract first JSON object (handles extra text before/after)
+        m = re.search(r'\{.*\}', result, re.DOTALL)
+        if not m:
+            return None
+        parsed = json.loads(m.group(0))
         # Empty dict = no prompt found
         if not parsed or (not parsed.get("prompt_en") and not parsed.get("prompt_cn")):
             return None
@@ -442,10 +446,13 @@ async def main():
                     await page.goto(full_url, wait_until="domcontentloaded", timeout=60000)
                     await page.wait_for_timeout(3000)
 
-                    # Detect error/block pages
-                    page_text = await page.evaluate("document.body?.innerText?.slice(0, 200) || ''")
-                    if "无法浏览" in page_text or "已被删除" in page_text or "不存在" in page_text:
-                        print(f"  ⚠️ 页面不可用，跳过")
+                    # Detect error/block pages (scan full body text)
+                    page_text = await page.evaluate("document.body?.innerText || ''")
+                    _error_keywords = ["无法浏览", "已被删除", "不存在", "IP存在风险",
+                                       "暂时无法", "内容不见了", "页面不存在", "访问受限"]
+                    if any(kw in page_text[:500] for kw in _error_keywords):
+                        preview = page_text[:80].replace('\n', ' ')
+                        print(f"  ⚠️ 页面不可用 ({preview})，跳过")
                         rejected += 1
                         await asyncio.sleep(1)
                         continue
