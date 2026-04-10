@@ -446,17 +446,6 @@ async def main():
                     await page.goto(full_url, wait_until="domcontentloaded", timeout=60000)
                     await page.wait_for_timeout(3000)
 
-                    # Detect error/block pages (scan full body text)
-                    page_text = await page.evaluate("document.body?.innerText || ''")
-                    _error_keywords = ["无法浏览", "已被删除", "不存在", "IP存在风险",
-                                       "暂时无法", "内容不见了", "页面不存在", "访问受限"]
-                    if any(kw in page_text[:500] for kw in _error_keywords):
-                        preview = page_text[:80].replace('\n', ' ')
-                        print(f"  ⚠️ 页面不可用 ({preview})，跳过")
-                        rejected += 1
-                        await asyncio.sleep(1)
-                        continue
-
                     meta = await extract_note_metadata(page)
                     img_urls = await extract_all_images(page)
                     title = meta.get("title", "")
@@ -464,6 +453,16 @@ async def main():
 
                     print(f"  📝 {(title or '无')[:50]}")
                     print(f"  👤 {meta.get('authorName') or '未知'}  🖼️ {len(img_urls)} 张")
+
+                    # Detect error/block pages via title or description content
+                    _error_keywords = ["无法浏览", "已被删除", "不存在", "IP存在风险",
+                                       "暂时无法", "内容不见了", "页面不存在", "访问受限"]
+                    combined = (title or "") + (desc or "")
+                    if any(kw in combined for kw in _error_keywords) or (not title and not desc):
+                        print(f"  ⚠️ 页面不可用，跳过")
+                        rejected += 1
+                        await asyncio.sleep(1)
+                        continue
 
                     # LLM quality check: extract prompt, skip if none
                     print(f"  🤖 提取提示词...")
