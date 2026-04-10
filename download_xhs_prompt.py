@@ -216,70 +216,50 @@ async def extract_note_metadata(page: Page) -> dict:
 # Search results scrolling
 # ---------------------------------------------------------------------------
 async def scroll_and_collect_notes(page: Page, max_notes: int) -> list[str]:
-    """Scroll search results and collect note URLs WITH xsec_token by clicking each card."""
-    seen_ids: set[str] = set()
-    note_urls: list[str] = []
-    search_url = page.url
+    """Scroll search results page and collect note URLs (with xsec_token via getAttribute)."""
+    seen = set()
+    collected = []
 
     await page.wait_for_timeout(3000)
     print(f"  📄 页面: {(await page.title())[:60]} | URL: {page.url[:80]}")
 
-    scroll_round = 0
-    while len(note_urls) < max_notes and scroll_round < 30:
-        # Collect note IDs visible on current page
-        visible_ids: list[str] = await page.evaluate("""
+    for round_i in range(25):
+        # getAttribute('href') returns the raw HTML attribute value which includes xsec_token
+        hrefs: list[str] = await page.evaluate("""
             () => {
-                const ids = [];
+                const hrefs = new Set();
                 document.querySelectorAll('a[href]').forEach(a => {
-                    const m = (a.href || '').match(/\/explore\/([a-f0-9]{24})|\/discovery\/item\/([a-f0-9]{24})/);
-                    if (m) ids.push(m[1] || m[2]);
+                    const h = a.getAttribute('href') || '';
+                    if (/\/explore\/[a-f0-9]{24}/.test(h) ||
+                        /\/discovery\/item\/[a-f0-9]{24}/.test(h) ||
+                        /\/note\/[a-f0-9]{24}/.test(h)) {
+                        hrefs.add(h);
+                    }
                 });
-                return [...new Set(ids)];
+                return [...hrefs];
             }
         """)
 
-        if scroll_round == 0 and not visible_ids:
+        if round_i == 0 and not hrefs:
             snippet = await page.evaluate("document.body?.innerText?.slice(0, 300) || ''")
             print(f"  ⚠️ 未找到笔记链接，页面片段:\n{snippet}")
 
-        new_this_round = 0
-        for note_id in visible_ids:
-            if note_id in seen_ids or len(note_urls) >= max_notes:
-                continue
-            seen_ids.add(note_id)
+        prev_count = len(seen)
+        for href in hrefs:
+            if href not in seen:
+                seen.add(href)
+                collected.append(href)
 
-            # Click the card to let XHS JS generate xsec_token in navigation URL
-            try:
-                card = await page.query_selector(
-                    f'a[href*="/explore/{note_id}"], a[href*="/discovery/item/{note_id}"]'
-                )
-                if not card:
-                    continue
-                async with page.expect_navigation(wait_until="domcontentloaded", timeout=20000):
-                    await card.click()
-                note_urls.append(page.url)  # URL now contains xsec_token
-                new_this_round += 1
-                # Return to search results
-                await page.go_back(wait_until="domcontentloaded")
-                await page.wait_for_timeout(1200)
-            except Exception as e:
-                # Navigation failed — try to recover back to search page
-                if search_url not in page.url:
-                    try:
-                        await page.goto(search_url, wait_until="domcontentloaded", timeout=30000)
-                        await page.wait_for_timeout(2000)
-                    except Exception:
-                        pass
+        if len(collected) >= max_notes:
+            break
 
-        # Scroll down to load more cards
         await page.evaluate("window.scrollBy(0, 900)")
         await page.wait_for_timeout(1800)
-        scroll_round += 1
 
-        if new_this_round == 0 and scroll_round >= 3:
-            break  # No new cards after several scrolls
+        if len(seen) == prev_count and round_i >= 2:
+            break
 
-    return note_urls[:max_notes]
+    return collected[:max_notes]
 
 
 # ---------------------------------------------------------------------------
