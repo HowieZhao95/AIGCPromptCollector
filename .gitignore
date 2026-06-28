@@ -21,3 +21,4 @@ images/
 .claude/
 .vscode/
 .idea/
+.DS_Store

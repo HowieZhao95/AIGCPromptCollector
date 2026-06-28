@@ -107,19 +107,29 @@ class Database:
 # ---------------------------------------------------------------------------
 # Carousel image extraction
 # ---------------------------------------------------------------------------
+MIN_IMAGE_DIMENSION = 200  # px — images smaller than this on either side are skipped
+
+
 async def extract_all_images(page: Page) -> list[str]:
     """Extract all image/video-thumbnail URLs from a note detail page, including carousel."""
     img_urls = await page.evaluate("""
-        () => {
+        (minDim) => {
             const urls = new Set();
             const xhsFilter = u => u && (
                 u.includes('xhscdn') || u.includes('sns-img') || u.includes('sns-video') || u.includes('ci.xiaohongshu')
-            ) && !u.includes('avatar') && !u.includes('emoji') && !u.includes('logo');
+            ) && !u.includes('avatar') && !u.includes('emoji') && !u.includes('logo')
+              && !u.includes('fe-platform') && !u.includes('/platform/')
+              && !u.includes('/comment/');
 
             // All img tags (swiper containers + page-wide)
             document.querySelectorAll('img').forEach(img => {
                 const src = img.src || img.dataset.src || img.getAttribute('data-lazyload') || '';
-                if (xhsFilter(src)) urls.add(src);
+                if (!xhsFilter(src)) return;
+                // Filter out small thumbnails/icons when dimensions are known
+                const w = img.naturalWidth || 0;
+                const h = img.naturalHeight || 0;
+                if (w > 0 && h > 0 && (w < minDim || h < minDim)) return;
+                urls.add(src);
             });
 
             // Video poster thumbnails (standard video element)
@@ -154,7 +164,7 @@ async def extract_all_images(page: Page) -> list[str]:
 
             return [...urls].filter(xhsFilter);
         }
-    """)
+    """, MIN_IMAGE_DIMENSION)
 
     # Fallback: click through carousel if indicator shows more images
     indicator = await page.query_selector('[class*="indicator"], [class*="counter"]')
@@ -282,6 +292,9 @@ MODEL_ALIASES = {
                    "banana pro", "bananapro", "banana-pro", "banana 2",
                    "nano banana 2", "lovart", "lovart (nano banana 2)",
                    "banana (推测为 banana2/bananapro)"],
+    "GPT Image 2": ["gpt image 2", "gpt-image-2", "gptimage2", "gpt image2",
+                    "gpt4o image", "gpt-4o image", "chatgpt image", "openai image",
+                    "image 2", "image2"],
 }
 
 # Build reverse lookup: lowercase variant -> canonical name
@@ -301,13 +314,56 @@ def normalize_model(raw: str) -> str:
     return canonical if canonical in VALID_MODELS else ""
 
 
+_VIDEO_KEYWORDS = [
+    "视频", "短片", "短剧", "运动镜头", "fps", "帧率",
+    "分镜", "故事板", "storyboard", "video", "animation",
+    "motion", "clip", "duration", "seedance", "即梦", "runway",
+    "sora", "kling", "可灵", "文生视频", "图生视频", "veo",
+]
+
+
+def _infer_default_model(parsed: dict) -> str:
+    """If model is unknown, return 'Seedance' for video prompts, else 'NanoBanana'."""
+    combined = " ".join([
+        parsed.get("prompt_cn") or "",
+        parsed.get("prompt_en") or "",
+        parsed.get("parameters") or "",
+        " ".join(parsed.get("style_tags") or []),
+    ]).lower()
+    if any(kw in combined for kw in _VIDEO_KEYWORDS):
+        return "Seedance"
+    return "NanoBanana"
+
+
+# 原始标题为这些值时视为无效，改用 LLM 生成的描述性标题
+BAD_TITLES: set[str] = {
+    "温馨提示", "跟风一下", "效果好的，付费没问题",
+    "寄蜉蝣于天地，渺沧海之一粟", "4.3词", "4.0关键词",
+    "软装拆解", "夜话乞巧", "荷花泉水",
+}
+
+
+def _is_bad_title(title: str) -> bool:
+    if not title:
+        return True
+    if title.strip() in BAD_TITLES:
+        return True
+    # 标题过短（≤4字）且不含 AI 相关词
+    ai_keywords = ["ai", "AI", "提示词", "渲染", "建筑", "室内", "景观", "效果图", "生图", "画", "Banana", "Flux", "MJ"]
+    if len(title.strip()) <= 4 and not any(k in title for k in ai_keywords):
+        return True
+    return False
+
+
 PROMPT_SYSTEM = """你是 AI 图像/视频生成提示词提取专家。从小红书笔记中提取提示词信息。
 如果笔记包含 AI 图像或视频生成提示词，返回严格 JSON（不要 markdown 代码块）：
-{"prompt_en": "英文提示词", "prompt_cn": "中文提示词", "model": "模型名", "parameters": "参数", "style_tags": ["标签"]}
+{"title": "描述性标题", "prompt_en": "英文提示词", "prompt_cn": "中文提示词", "model": "模型名", "parameters": "参数", "style_tags": ["标签"]}
+- title: 10-20字的中文描述性标题，概括这条提示词的用途/风格/场景（如"极简现代室内渲染提示词"、"GPT Image2城市海报生成"），不要照抄原标题中的废话
 - prompt_en / prompt_cn: 至少有一个非空
-- model: 必须是以下之一（严格匹配）: Midjourney, FLUX, Seedream, Seedance, NanoBanana
-  - 别名对照: MJ/Mid Journey → Midjourney, Flux.1/Flux1 → FLUX, Nano Banana → NanoBanana, Seed Dream → Seedream, Seedance2.0/Seed Dance → Seedance
+- model: 必须是以下之一（严格匹配）: Midjourney, FLUX, Seedream, Seedance, NanoBanana, GPT Image 2
+  - 别名对照: MJ/Mid Journey → Midjourney, Flux.1/Flux1 → FLUX, Nano Banana → NanoBanana, Seed Dream → Seedream, Seedance2.0/Seed Dance → Seedance, GPT-Image-2/ChatGPT Image/OpenAI Image → GPT Image 2
   - Seedream 是字节跳动图像生成模型，Seedance 是字节跳动视频生成模型，注意区分
+  - GPT Image 2 是 OpenAI 的图像生成模型（也称 gpt-image-2、GPT-4o image 生成等）
   - 如果笔记中的模型不属于以上任何一个，model 填空字符串 ""
 - parameters: 如 --ar 16:9, --v 6, steps, cfg, 分辨率, 时长等
 - style_tags: 风格关键词列表
@@ -315,29 +371,50 @@ PROMPT_SYSTEM = """你是 AI 图像/视频生成提示词提取专家。从小�
 如果笔记不包含任何 AI 图像或视频生成提示词，返回空 JSON: {}"""
 
 
-async def extract_prompt(client: httpx.AsyncClient, title: str, description: str) -> str | None:
+LLM_MODEL = "xiaomi/mimo-v2.5"
+MAX_IMAGES_FOR_LLM = 3  # 每条笔记最多传给 LLM 的图片数
+
+
+async def extract_prompt(
+    client: httpx.AsyncClient,
+    title: str,
+    description: str,
+    image_urls: list[str] | None = None,
+) -> str | None:
     """Call LLM to extract structured prompt. Returns JSON string or None if no prompt found."""
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         return None
+
+    # Build user message content: text + images
+    text_part = f"标题: {title or '无'}\n\n正文: {description or '无'}"
+    user_content: list[dict] = [{"type": "text", "text": text_part}]
+    for url in (image_urls or [])[:MAX_IMAGES_FOR_LLM]:
+        stable = _stable_xhs_url(url)  # 转换为 ci.xiaohongshu.com 稳定地址
+        user_content.append({
+            "type": "image_url",
+            "image_url": {"url": stable},
+        })
+
     try:
         resp = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": "anthropic/claude-sonnet-4-5",
+                "model": LLM_MODEL,
                 "messages": [
                     {"role": "system", "content": PROMPT_SYSTEM},
-                    {"role": "user", "content": f"标题: {title or '无'}\n\n正文: {description or '无'}"},
+                    {"role": "user", "content": user_content},
                 ],
                 "temperature": 0,
             },
-            timeout=30,
+            timeout=60,
         )
-        if resp.status_code != 200:
-            print(f"    ⚠️ LLM API {resp.status_code}")
+        body = resp.json()
+        if resp.status_code != 200 or "choices" not in body:
+            print(f"    ⚠️ LLM API {resp.status_code}: {body.get('error', body)}")
             return None
-        result = resp.json()["choices"][0]["message"]["content"].strip()
+        result = body["choices"][0]["message"]["content"].strip()
         # Strip markdown code block if present
         if result.startswith("```"):
             result = re.sub(r'^```(?:json)?\s*', '', result)
@@ -353,6 +430,9 @@ async def extract_prompt(client: httpx.AsyncClient, title: str, description: str
         # Normalize model name
         if parsed.get("model"):
             parsed["model"] = normalize_model(parsed["model"])
+        # Fallback: if model still empty, infer image vs video and assign default
+        if not parsed.get("model"):
+            parsed["model"] = _infer_default_model(parsed)
         return json.dumps(parsed, ensure_ascii=False)
     except Exception as e:
         print(f"    ⚠️ LLM: {e}")
@@ -463,8 +543,8 @@ async def main():
                         continue
 
                     # LLM quality check: extract prompt, skip if none
-                    print(f"  🤖 提取提示词...")
-                    prompt_json = await extract_prompt(client, title, desc)
+                    print(f"  🤖 提取提示词（含 {min(len(img_urls), MAX_IMAGES_FOR_LLM)} 张图）...")
+                    prompt_json = await extract_prompt(client, title, desc, img_urls)
                     if not prompt_json:
                         print(f"  ⛔ 无有效提示词，跳过")
                         rejected += 1
@@ -473,10 +553,21 @@ async def main():
 
                     print(f"  ✅ 提示词已提取")
 
+                    # 坏标题用 LLM 生成的描述性标题替换
+                    final_title = title
+                    if _is_bad_title(title):
+                        try:
+                            llm_title = json.loads(prompt_json).get("title", "").strip()
+                            if llm_title:
+                                final_title = llm_title
+                                print(f"  📝 标题修正: {title!r} → {final_title!r}")
+                        except Exception:
+                            pass
+
                     canonical_url = f"https://www.xiaohongshu.com/explore/{note_id}"
                     db.insert_note(
                         note_id=note_id, url=canonical_url,
-                        title=title, description=desc,
+                        title=final_title, description=desc,
                         author_name=meta.get("authorName", ""), author_id=meta.get("authorId", ""),
                         publish_time=meta.get("publishTime", ""),
                         category=args.category, search_keyword=args.keyword,
