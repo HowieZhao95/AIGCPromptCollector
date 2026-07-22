@@ -31,6 +31,9 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 DB_PATH = str(Path(__file__).parent / "xhs_notes.db")
 ENV_FILE = Path(__file__).parent / ".env"
 
+# Allowed category values — must match CATEGORY_TO_DOMAIN in showcase-taxonomy.ts exactly
+VALID_CATEGORIES = {"人物", "室内", "建筑", "景观", "排版", "游戏", "电商", "产品", "电影", "短片"}
+
 PLATFORMS = {
     "xhs": {
         "name": "小红书",
@@ -239,8 +242,8 @@ async def list_notes(
         where.append("json_extract(n.structured_prompt, '$.model') = ?")
         params.append(model)
     if search:
-        where.append("(n.title LIKE ? OR n.description LIKE ?)")
-        params.extend([f"%{search}%", f"%{search}%"])
+        where.append("(n.title LIKE ? OR n.description LIKE ? OR n.structured_prompt LIKE ?)")
+        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
 
     where_sql = (" WHERE " + " AND ".join(where)) if where else ""
 
@@ -412,6 +415,8 @@ async def create_task(body: dict):
     category = body.get("category", "")
     if not keyword or not category:
         return {"error": "keyword 和 category 必填"}
+    if category not in VALID_CATEGORIES:
+        return {"error": f"category 不合法，必须是以下之一：{'、'.join(sorted(VALID_CATEGORIES))}"}
 
     max_notes = body.get("max_notes", 20)
     delay = body.get("delay", 3)
@@ -780,6 +785,8 @@ async def create_schedule(body: dict):
     category = body.get("category", "")
     if not keyword or not category:
         return {"error": "keyword 和 category 必填"}
+    if category not in VALID_CATEGORIES:
+        return {"error": f"category 不合法，必须是以下之一：{'、'.join(sorted(VALID_CATEGORIES))}"}
     max_notes = body.get("max_notes", 20)
     delay = body.get("delay", 3)
     interval_hours = body.get("interval_hours", 24)

@@ -463,7 +463,11 @@ function route() {
       link.classList.remove('text-gray-500', 'hover:bg-white/[0.03]', 'hover:text-gray-300');
     }
     if (page === 'dashboard') loadDashboard();
-    if (page === 'notes') { notesPage = 1; loadFilters(); loadNotes(); }
+    if (page === 'notes') {
+      const _fs = JSON.parse(sessionStorage.getItem('notes_filter') || '{}');
+      notesPage = _fs.page || 1;
+      loadFilters(); loadNotes();
+    }
     if (page === 'tasks') initTaskPage();
     if (page === 'schedules') initSchedulePage();
     if (page === 'settings') loadSettings();
@@ -763,6 +767,8 @@ async function loadNotes() {
   const model = document.getElementById('filter-model').value;
   const search = document.getElementById('filter-search').value;
 
+  sessionStorage.setItem('notes_filter', JSON.stringify({ cat, model, search, page: notesPage }));
+
   let url = `/notes?page=${notesPage}&per_page=24`;
   if (cat) url += `&category=${encodeURIComponent(cat)}`;
   if (model) url += `&model=${encodeURIComponent(model)}`;
@@ -805,6 +811,12 @@ async function loadFilters() {
   modSel.innerHTML = `<option value="">${t('notes.all_models')}</option>`;
   cats.forEach(c => catSel.innerHTML += `<option value="${esc(c)}">${esc(c)}</option>`);
   models.forEach(m => modSel.innerHTML += `<option value="${esc(m)}">${esc(m)}</option>`);
+  try {
+    const s = JSON.parse(sessionStorage.getItem('notes_filter') || '{}');
+    if (s.cat)    catSel.value = s.cat;
+    if (s.model)  modSel.value = s.model;
+    if (s.search) document.getElementById('filter-search').value = s.search;
+  } catch {}
 }
 
 let filterTimer;
