@@ -564,9 +564,8 @@ async def main():
                         except Exception:
                             pass
 
-                    canonical_url = f"https://www.xiaohongshu.com/explore/{note_id}"
                     db.insert_note(
-                        note_id=note_id, url=canonical_url,
+                        note_id=note_id, url=full_url,
                         title=final_title, description=desc,
                         author_name=meta.get("authorName", ""), author_id=meta.get("authorId", ""),
                         publish_time=meta.get("publishTime", ""),
